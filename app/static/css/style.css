@@ -1,0 +1,85 @@
+/* Variáveis de Design System */
+:root {
+    --primary: #1d4ed8;
+    --primary-light: #eff6ff;
+    --primary-dark: #1e3a8a;
+    --secondary: #0ea5e9;
+    --accent: #f97316;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --light-bg: #f1f5f9;
+    --bg-section: #f1f5f9;
+    --card-bg: #ffffff;
+    --border: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --sidebar-bg: #0f172a;
+    --sidebar-w: 260px;
+    --r-md: 12px;
+    --font: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Dark Mode Overrides */
+:root.dark-mode {
+    --light-bg: #0d1117;
+    --card-bg: #161b22;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font);
+    background: var(--light-bg);
+    color: var(--text-primary);
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Estrutura de Layout */
+.sidebar {
+    width: var(--sidebar-w);
+    background: var(--sidebar-bg);
+    height: 100vh;
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-wrapper {
+    flex: 1;
+    margin-left: var(--sidebar-w);
+    padding: 24px;
+}
+
+/* Kanban */
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+}
+
+.kanban-column {
+    background: var(--light-bg);
+    border-radius: var(--r-md);
+    padding: 14px;
+    min-height: 600px;
+    border: 1.5px solid var(--border);
+}
+
+.kanban-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid var(--primary);
+    cursor: grab;
+}
+
+/* Botões e Tabelas - Adicione o restante do CSS original aqui */
+.btn-primary { background: var(--primary); color: white; border-radius: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; border: none; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { padding: 12px; border-bottom: 1px solid var(--border); text-align: left; }
