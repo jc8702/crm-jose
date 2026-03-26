@@ -42,3 +42,10 @@ class Faturamento(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"))
     
     cliente = relationship("Cliente", back_populates="faturamentos")
+
+class CRMState(Base):
+    """ Tabela para armazenar o estado completo do CRM (Sync) """
+    __tablename__ = "crm_state"
+    id = Column(Integer, primary_key=True, index=True)
+    data = Column(JSON)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)

@@ -570,7 +570,7 @@
                 </div>
                 <div id="fbSyncTxt" style="color:rgba(255,255,255,0.4);font-size:11px;">Aguardando sincronização</div>
                 <div id="fbUserTxt" style="color:rgba(255,255,255,0.3);font-size:10px;margin-top:4px;font-family:monospace;word-break:break-all;display:none"></div>
-                <button onclick="sincronizarComFirebase(true)" style="margin-top:8px;width:100%;padding:6px;background:rgba(14,110,110,0.3);border:1px solid rgba(14,110,110,0.5);color:#5dd8d8;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:background .2s" onmouseover="this.style.background='rgba(14,110,110,0.5)'" onmouseout="this.style.background='rgba(14,110,110,0.3)'">🔄 Sincronizar Agora</button>
+                <button onclick="fazerBackupLocal(true)" style="margin-top:8px;width:100%;padding:6px;background:rgba(14,110,110,0.3);border:1px solid rgba(14,110,110,0.5);color:#5dd8d8;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:background .2s" onmouseover="this.style.background='rgba(14,110,110,0.5)'" onmouseout="this.style.background='rgba(14,110,110,0.3)'">🔄 Sincronizar com Banco Local</button>
             </div>
         </div>
     </div>
@@ -732,24 +732,7 @@
             </div>
         </div>
 
-            <!-- SEÇÃO: PREVISÃO DE PRÓXIMAS COMPRAS -->
-            <div class="section">
-                <h2 id="tituloPrevisaoCompras">📅 Previsão de Próximas Compras</h2>
-                <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px;">
-                    Estimativa baseada no ciclo definido no cadastro do cliente ou no intervalo médio entre compras. Quanto mais pedidos registrados, maior a precisão (★★★).
-                </p>
-
-                <!-- Seletor de mês -->
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-                    <button onclick="prevMesPrevisao()" style="padding:8px 14px;border:1.5px solid var(--border);background:var(--card-bg);border-radius:var(--r-sm);cursor:pointer;font-size:16px;font-weight:700;color:var(--text-primary);transition:all .15s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">‹</button>
-                    <div style="font-size:15px;font-weight:700;color:var(--text-primary);min-width:130px;text-align:center;" id="labelMesPrevisao">—</div>
-                    <button onclick="nextMesPrevisao()" style="padding:8px 14px;border:1.5px solid var(--border);background:var(--card-bg);border-radius:var(--r-sm);cursor:pointer;font-size:16px;font-weight:700;color:var(--text-primary);transition:all .15s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">›</button>
-                    <button onclick="irParaHojePrevisao()" style="padding:8px 16px;border:1.5px solid var(--primary);background:var(--primary-light);border-radius:var(--r-sm);cursor:pointer;font-size:13px;font-weight:600;color:var(--primary);transition:all .15s;">Mês Atual</button>
-                    <span id="resumoMesPrevisao" style="font-size:13px;color:var(--text-secondary);"></span>
-                </div>
-
-                <div id="tabelaPrevisaoCompras"></div>
-            </div>
+            <!-- SEÇÃO DE PREVISÃO REMOVIDA A PEDIDO DO USUARIO -->
 
         </div>
 
@@ -2493,9 +2476,9 @@
             localStorage.setItem('clientes', JSON.stringify(app.clientes));
             localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
             localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes || []));
-            // Sincroniza com Firebase a cada salvar (debounced)
+            // Sincroniza com SQLite local a cada salvar (debounced)
             clearTimeout(window._fbSyncTimer);
-            window._fbSyncTimer = setTimeout(() => sincronizarComFirebase(false), 1500);
+            window._fbSyncTimer = setTimeout(() => fazerBackupLocal(false), 1500);
         }
 
         // ===== FIREBASE CONFIGURATION =====
@@ -6542,9 +6525,59 @@
             }
         }
 
+        function _dbSetStatus(estado, msg) {
+            const dot = document.getElementById('fbDot');
+            const txt = document.getElementById('fbStatusTxt');
+            if(dot) { dot.style.background = estado === 'erro' ? '#ef4444' : (estado==='conectado' ? '#22c55e' : '#f59e0b'); }
+            if(txt) { txt.textContent = msg; }
+        }
+
+        async function carregarBancoSQL() {
+            _dbSetStatus('conectando', 'SQLite...');
+            try {
+                const response = await fetch('/api/sync');
+                if (response.ok) {
+                    const dados = await response.json();
+                    if (dados && Object.keys(dados).length > 0) {
+                        if (dados.faturamentos) localStorage.setItem('faturamentos', JSON.stringify(dados.faturamentos));
+                        if (dados.clientes) localStorage.setItem('clientes', JSON.stringify(dados.clientes));
+                        if (dados.projetos) localStorage.setItem('projetos', JSON.stringify(dados.projetos));
+                        if (dados.visitas) localStorage.setItem('visitas', JSON.stringify(dados.visitas));
+                        if (dados.oportunidades) localStorage.setItem('oportunidades', JSON.stringify(dados.oportunidades));
+                        if (dados.visitasReunioes) localStorage.setItem('visitasReunioes', JSON.stringify(dados.visitasReunioes));
+                        
+                        app.faturamentos = dados.faturamentos || [];
+                        app.projetos = dados.projetos || [];
+                        app.visitas = dados.visitas || [];
+                        app.clientes = dados.clientes || {};
+                        app.oportunidades = dados.oportunidades || [];
+                        app.visitasReunioes = dados.visitasReunioes || [];
+                        
+                        _dbSetStatus('conectado', '✅ API SQLite');
+                        atualizarDashboard();
+                    } else {
+                        _dbSetStatus('conectado', '✅ DB Novo');
+                        // Se não tem banco, salva os dados default que estão em memória no SQLite!
+                        fazerBackupLocal(false);
+                    }
+                }
+            } catch (err) { _dbSetStatus('erro', '❌ API Offline'); }
+        }
+
+        function fazerBackupLocal(manual) {
+            _dbSetStatus('conectando', 'Salvando...');
+            const payload = {
+                faturamentos: app.faturamentos, clientes: app.clientes, projetos: app.projetos,
+                visitas: app.visitas, oportunidades: app.oportunidades, visitasReunioes: app.visitasReunioes
+            };
+            fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            .then(() => { _dbSetStatus('conectado', '✅ Salvo no Banco'); if(manual) alert('Salvo no banco de dados com sucesso!'); })
+            .catch(() => { _dbSetStatus('erro', '❌ Falha API'); if(manual) alert('Erro ao salvar no banco local (FastAPI OFF).'); });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
-            // Inicializar Firebase PRIMEIRO
-            inicializarFirebase();
+            // Inicializar Banco SQL do FastAPI PRIMEIRO
+            carregarBancoSQL();
             
             // Inicializar settings
             initializeDarkMode();
