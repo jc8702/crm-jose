@@ -2505,6 +2505,8 @@
             projetoEmTransicao: null
         };
 
+        const CLOUD_STATE_KEY = 'jose_haco_rfid_2026';
+
         // Se não há clientes salvos, carrega os padrões uma única vez
         if (Object.keys(app.clientes).length === 0) {
             Object.assign(app.clientes, clientesComErp);
@@ -2519,6 +2521,69 @@
             ];
         }
 
+        function _snapshotAppState() {
+            return {
+                faturamentos: app.faturamentos || [],
+                projetos: app.projetos || [],
+                visitas: app.visitas || [],
+                clientes: app.clientes || {},
+                oportunidades: app.oportunidades || [],
+                visitasReunioes: app.visitasReunioes || [],
+                currentMonth: app.currentMonth,
+                currentYear: app.currentYear
+            };
+        }
+
+        function _applyAppState(state) {
+            if (!state || typeof state !== 'object') return;
+            app.faturamentos = Array.isArray(state.faturamentos) ? state.faturamentos : [];
+            app.projetos = Array.isArray(state.projetos) ? state.projetos : [];
+            app.visitas = Array.isArray(state.visitas) ? state.visitas : [];
+            app.clientes = (state.clientes && typeof state.clientes === 'object') ? state.clientes : {};
+            app.oportunidades = Array.isArray(state.oportunidades) ? state.oportunidades : [];
+            app.visitasReunioes = Array.isArray(state.visitasReunioes) ? state.visitasReunioes : [];
+            app.currentMonth = Number.isFinite(state.currentMonth) ? state.currentMonth : (new Date().getMonth() + 1);
+            app.currentYear = Number.isFinite(state.currentYear) ? state.currentYear : 2026;
+        }
+
+        async function carregarEstadoServidor() {
+            try {
+                const res = await fetch(`/api/state/${CLOUD_STATE_KEY}`);
+                if (!res.ok) return false;
+                const data = await res.json();
+                if (!data || !data.found || !data.payload) return false;
+
+                _applyAppState(data.payload);
+                localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+                localStorage.setItem('projetos', JSON.stringify(app.projetos));
+                localStorage.setItem('visitas', JSON.stringify(app.visitas));
+                localStorage.setItem('clientes', JSON.stringify(app.clientes));
+                localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
+                localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes || []));
+                return true;
+            } catch (e) {
+                console.warn('Falha ao carregar estado do servidor:', e);
+                return false;
+            }
+        }
+
+        async function salvarEstadoServidor(manual) {
+            try {
+                const payload = _snapshotAppState();
+                const res = await fetch(`/api/state/${CLOUD_STATE_KEY}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payload })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return true;
+            } catch (e) {
+                if (manual) alert('Falha ao salvar no servidor. Seus dados ficaram no navegador e tentaremos novamente.');
+                console.warn('Falha ao salvar estado no servidor:', e);
+                return false;
+            }
+        }
+
         function salvar() {
             localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
             localStorage.setItem('projetos', JSON.stringify(app.projetos));
@@ -2529,6 +2594,9 @@
             // Sincroniza com Firebase a cada salvar (debounced)
             clearTimeout(window._fbSyncTimer);
             window._fbSyncTimer = setTimeout(() => sincronizarComFirebase(false), 1500);
+            // Persistencia principal no backend/Neon (Render)
+            clearTimeout(window._cloudSyncTimer);
+            window._cloudSyncTimer = setTimeout(() => salvarEstadoServidor(false), 1200);
         }
 
         // ===== FIREBASE CONFIGURATION =====
@@ -2733,6 +2801,7 @@
                 .then(() => {
                     const agora = new Date().toLocaleTimeString('pt-BR');
                     _fbSetStatus('conectado', '✅ Sincronizado', '☁️ Último sync: ' + agora);
+                    salvarEstadoServidor(false);
                     if (manual) {
                         const dot = document.getElementById('fbDot');
                         if (dot) {
@@ -6710,7 +6779,10 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Carrega estado persistido no backend (Render/Neon) antes de montar UI
+            await carregarEstadoServidor();
+
             // Inicializar Firebase PRIMEIRO
             inicializarFirebase();
             
@@ -6740,6 +6812,8 @@
 
             // Sincronizar com Firebase a cada 30 segundos (backup periódico)
             setInterval(() => sincronizarComFirebase(false), 30000);
+            // Sincronizar com backend (persistencia principal) a cada 30 segundos
+            setInterval(() => salvarEstadoServidor(false), 30000);
         });
 
         // ═══════════════════════════════════════════════════════════
