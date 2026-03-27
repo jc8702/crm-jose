@@ -9,6 +9,7 @@ from typing import List
 
 from . import models, schemas
 from .database import engine, get_db
+from .google_sheets import fetch_sheet_data, get_sheet_headers
 
 #models.Base.metadata.create_all(bind=engine)
 
@@ -77,6 +78,55 @@ def delete_oportunidade(op_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 # --- Sincronização de Estado (Substitui o Firebase) ---
+
+@app.get("/api/google-sheets/headers")
+def fetch_headers(spreadsheet_id: str, sheet_name: str = "Página1", db: Session = Depends(get_db)):
+    try:
+        headers = get_sheet_headers(spreadsheet_id, sheet_name)
+        return {"headers": headers}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/google-sheets/sync")
+async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
+    # O payload deve conter: spreadsheet_id, sheet_name, e mapping (ex: { 'Cliente': 'Coluna A', ... })
+    body = await request.json()
+    spreadsheet_id = body.get("spreadsheet_id")
+    sheet_name = body.get("sheet_name", "Página1")
+    mapping = body.get("mapping", {})
+    
+    if not spreadsheet_id or not mapping:
+        raise HTTPException(status_code=400, detail="Faltam parâmetros de configuração.")
+    
+    try:
+        # 1. Busca todos os dados da planilha (Range A1:Z1000 por padrão)
+        range_name = f"'{sheet_name}'!A1:Z1000"
+        data = fetch_sheet_data(spreadsheet_id, range_name)
+        
+        if not data or len(data) < 2:
+            return {"message": "Planilha vazia ou sem dados além do cabeçalho."}
+
+        headers = data[0]
+        rows = data[1:]
+        
+        # 2. Transforma em formato amigável para o CRM (lista de objetos)
+        results = []
+        for row in rows:
+            entry = {}
+            for target_field, source_col_name in mapping.items():
+                if source_col_name in headers:
+                    col_index = headers.index(source_col_name)
+                    if col_index < len(row):
+                        entry[target_field] = row[col_index]
+            if entry:
+                results.append(entry)
+
+        return {
+            "message": f"Sincronizados {len(results)} registros com sucesso!",
+            "data": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro na sincronização: {str(e)}")
 
 @app.get("/api/sync")
 def get_sync_state(db: Session = Depends(get_db)):

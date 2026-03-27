@@ -6,3 +6,5 @@ sqlalchemy==2.0.38
 gunicorn==23.0.0
 pg8000==1.31.2
 alembic==1.13.1
+google-auth==2.29.0
+google-api-python-client==2.125.0

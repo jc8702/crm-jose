@@ -504,6 +504,12 @@
             .sidebar-overlay.active { display: block; }
             #sidebarCloseMobile { display: flex !important; }
         }
+    #modalConfigGoogleSheets .modal-content { max-width: 650px; }
+    .mapping-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; background: var(--light-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+    :root.dark-mode .mapping-grid { background: #0d1117; border-color: #30363d; }
+    .mapping-item { display: flex; flex-direction: column; gap: 5px; }
+    .mapping-item label { font-size: 11px; color: var(--text-secondary); }
+    .sync-btn-container { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
     </style>
     </style>
 
@@ -804,7 +810,9 @@
 
                 <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 8px;">
                     <button class="btn-primary" onclick="salvarFaturamento()">✓ Registrar Faturamento</button>
-                    <button class="btn-primary" onclick="abrirModalImportarPlanilha()" style="background: linear-gradient(135deg, #0e6e6e, #0a4d4d); display: flex; align-items: center; gap: 8px;">📥 Importar Planilha</button>
+                    <button class="btn-primary" onclick="sincronizarGoogleSheets()" style="background: linear-gradient(135deg, #1d4ed8, #0ea5e9); display: flex; align-items: center; gap: 8px;">🔄 Sincronizar Google Sheets</button>
+                    <button class="btn-primary" onclick="abrirConfigGoogleSheets()" style="background: var(--text-secondary); display: flex; align-items: center; gap: 8px;">⚙️ Configurar Planilha</button>
+                    <button class="btn-primary" onclick="abrirModalImportarPlanilha()" style="background: linear-gradient(135deg, #0e6e6e, #0a4d4d); display: flex; align-items: center; gap: 8px; opacity: 0.7;">📥 Importar Manual (Excel)</button>
                 </div>
                 <div id="resultadoFaturamento" style="display: none; margin-top: 20px;"></div>
             </div>
@@ -7318,7 +7326,164 @@
             }
         }
 
-        function confirmarImportacao() {
+        // ================================================================
+        // GOOGLE SHEETS SYNC FUNCTIONS
+        // ================================================================
+        
+        function abrirConfigGoogleSheets() {
+            document.getElementById('modalConfigGoogleSheets').classList.add('active');
+            const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
+            document.getElementById('gs_spreadsheet_id').value = config.spreadsheet_id || '';
+            document.getElementById('gs_sheet_name').value = config.sheet_name || 'Página1';
+            
+            if (config.spreadsheet_id) {
+                buscarColunasGoogleSheets(true);
+            }
+        }
+
+        function fecharConfigGoogleSheets() {
+            document.getElementById('modalConfigGoogleSheets').classList.remove('active');
+        }
+
+        async function buscarColunasGoogleSheets(isInitial = false) {
+            const spreadsheet_id = document.getElementById('gs_spreadsheet_id').value.trim();
+            const sheet_name = document.getElementById('gs_sheet_name').value.trim();
+            
+            if (!spreadsheet_id) {
+                if (!isInitial) alert('⚠️ Insira o ID da planilha primeiro.');
+                return;
+            }
+
+            const btn = document.querySelector('#modalConfigGoogleSheets .btn-primary');
+            const originalText = btn.textContent;
+            btn.textContent = '⏳ Buscando colunas...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${sheet_name}`);
+                if (!response.ok) throw new Error('Não foi possível carregar a planilha. Verifique o ID e se ela é pública ou compartilhada com a Conta de Serviço.');
+                
+                const data = await response.json();
+                const headers = data.headers;
+                
+                if (!headers || headers.length === 0) throw new Error('Planilha vazia ou sem cabeçalhos na primeira linha.');
+
+                // Preencher os Selects de Mapeamento
+                const fields = ['cliente', 'data', 'valor', 'pedido'];
+                const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
+                const mapping = config.mapping || {};
+
+                fields.forEach(f => {
+                    const select = document.getElementById(`gs_map_${f}`);
+                    select.innerHTML = '<option value="">-- Selecione uma coluna --</option>';
+                    headers.forEach(h => {
+                        const option = document.createElement('option');
+                        option.value = h;
+                        option.textContent = h;
+                        if (mapping[f === 'cliente' ? 'Cliente' : f === 'data' ? 'Data' : f === 'valor' ? 'Valor' : 'Pedido Haco'] === h) {
+                            option.selected = true;
+                        } else if (!mapping[f] && h.toLowerCase().includes(f)) {
+                           // Tenta auto-selecionar se o nome for parecido
+                           option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                });
+
+                document.getElementById('gs_mapping_container').style.display = 'block';
+                if (!isInitial) alert('✅ Colunas detectadas com sucesso!');
+
+            } catch (err) {
+                alert('❌ Erro: ' + err.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function salvarConfigGoogleSheets() {
+            const spreadsheet_id = document.getElementById('gs_spreadsheet_id').value.trim();
+            const sheet_name = document.getElementById('gs_sheet_name').value.trim();
+            
+            const mapping = {
+                'Cliente': document.getElementById('gs_map_cliente').value,
+                'Data': document.getElementById('gs_map_data').value,
+                'Valor': document.getElementById('gs_map_valor').value,
+                'Pedido Haco': document.getElementById('gs_map_pedido').value
+            };
+
+            if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
+                alert('⚠️ Preencha o ID da planilha e mapeie pelo menos Cliente, Data e Valor.');
+                return;
+            }
+
+            const config = { spreadsheet_id, sheet_name, mapping };
+            localStorage.setItem('haco_gsheets_config', JSON.stringify(config));
+            
+            alert('✅ Configuração do Google Sheets salva com sucesso!');
+            fecharConfigGoogleSheets();
+        }
+
+        async function sincronizarGoogleSheets() {
+            const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
+            if (!config.spreadsheet_id || !config.mapping) {
+                alert('⚠️ Google Sheets não configurado. Clique em "Configurar Planilha" primeiro.');
+                abrirConfigGoogleSheets();
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="sincronizarGoogleSheets()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Sincronizando...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/google-sheets/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                if (!response.ok) throw new Error('Falha na sincronização com o banco de dados.');
+                
+                const result = await response.json();
+                
+                if (result.data && result.data.length > 0) {
+                    // Adicionar novos faturamentos (evitando duplicatas simples por Pedido Haco se existir)
+                    let novos = 0;
+                    result.data.forEach(item => {
+                        const jaExiste = item['Pedido Haco'] !== '-' && app.faturamentos.some(f => f.pedidoHaco === item['Pedido Haco']);
+                        if (!jaExiste) {
+                            // Procura o cliente exato no CRM
+                            const clienteKey = Object.keys(app.clientes).find(
+                                k => k.toLowerCase() === item['Cliente'].toLowerCase()
+                            ) || item['Cliente'];
+
+                            app.faturamentos.push({
+                                cliente: clienteKey,
+                                erp: app.clientes[clienteKey]?.erp || '',
+                                valor: parseFloat(item['Valor']),
+                                data: item['Data'],
+                                pedidoHaco: item['Pedido Haco'] || '-'
+                            });
+                            novos++;
+                        }
+                    });
+
+                    salvar();
+                    atualizarDashboard();
+                    alert(`✅ Sincronização concluída!\n\n${novos} novos faturamentos importados.\n${result.data.length - novos} duplicatas ignoradas.`);
+                } else {
+                    alert('ℹ️ Nenhuns dados novos encontrados na planilha.');
+                }
+
+            } catch (err) {
+                alert('❌ Erro na sincronização: ' + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
             const validos = importDadosProcessados.filter(r => r.valido);
             if (validos.length === 0) return;
 
@@ -7485,6 +7650,61 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- MODAL: CONFIGURAÇÃO GOOGLE SHEETS -->
+    <div id="modalConfigGoogleSheets" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Configuração Google Sheets</h3>
+                <button class="modal-close" onclick="fecharConfigGoogleSheets()">✕</button>
+            </div>
+            
+            <div class="form-group">
+                <label>ID da Planilha (Spreadsheet ID)</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="gs_spreadsheet_id" placeholder="Ex: 1a2b3c4d5e6f7g8h9i0j..." style="flex: 1;">
+                    <button class="btn-primary" onclick="buscarColunasGoogleSheets()">Detectar Colunas</button>
+                </div>
+                <small style="color: var(--text-secondary); margin-top: 5px; display: block;">
+                    O ID fica na URL da planilha: docs.google.com/spreadsheets/d/<b>[ID_AQUI]</b>/edit
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label>Nome da Aba (Sheet Name)</label>
+                <input type="text" id="gs_sheet_name" placeholder="Ex: Página1" value="Página1">
+            </div>
+
+            <div id="gs_mapping_container" style="display: none; margin-top: 25px;">
+                <h4 style="font-size: 14px; margin-bottom: 10px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 5px;">📍 Mapeamento de Colunas</h4>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">Diga ao sistema qual coluna da planilha corresponde a cada campo do CRM:</p>
+                
+                <div class="mapping-grid">
+                    <div class="mapping-item">
+                        <label>👤 Cliente</label>
+                        <select id="gs_map_cliente"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>📅 Data do Faturamento</label>
+                        <select id="gs_map_data"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>💰 Valor (R$)</label>
+                        <select id="gs_map_valor"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>📦 Pedido Haco (Opcional)</label>
+                        <select id="gs_map_pedido"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn-primary" style="background: var(--text-secondary);" onclick="fecharConfigGoogleSheets()">Cancelar</button>
+                <button class="btn-primary" onclick="salvarConfigGoogleSheets()">💾 Salvar Configuração</button>
+            </div>
+        </div>
     </div>
 
 </body>
