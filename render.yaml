@@ -6,7 +6,5 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
     envVars:
-      - key: DATABASE_URL
-        value: "COLE_AQUI_SUA_URL_DO_NEON"
       - key: PYTHON_VERSION
         value: 3.11.0
