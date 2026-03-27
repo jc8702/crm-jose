@@ -78,3 +78,17 @@ def get_sheet_headers(spreadsheet_id, sheet_name="Página1"):
         raise e
 
     return []
+
+def list_spreadsheet_sheets(spreadsheet_id):
+    """ Retorna uma lista com os títulos de todas as abas da planilha. """
+    service = get_sheets_service()
+    if not service:
+        raise RuntimeError("Serviço do Google Sheets não disponível (faltam credenciais).")
+
+    try:
+        metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        sheets = metadata.get('sheets', [])
+        return [s['properties']['title'] for s in sheets]
+    except Exception as e:
+        logger.error(f"Erro ao listar abas do Google Sheets {spreadsheet_id}: {str(e)}")
+        raise e

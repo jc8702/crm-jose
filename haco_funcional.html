@@ -7341,7 +7341,9 @@
             document.getElementById('modalConfigGoogleSheets').classList.add('active');
             const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
             document.getElementById('gs_spreadsheet_id').value = config.spreadsheet_id || '';
-            document.getElementById('gs_sheet_name').value = config.sheet_name || 'Página1';
+            
+            const sheetSelect = document.getElementById('gs_sheet_name');
+            sheetSelect.innerHTML = `<option value="${config.sheet_name || 'Página1'}">${config.sheet_name || 'Página1'}</option>`;
             
             if (config.spreadsheet_id) {
                 buscarColunasGoogleSheets(true);
@@ -7354,7 +7356,7 @@
 
         async function buscarColunasGoogleSheets(isInitial = false) {
             let spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
-            const sheet_name = document.getElementById('gs_sheet_name').value.trim();
+            let sheet_name = document.getElementById('gs_sheet_name').value;
             
             if (!spreadsheet_id) {
                 if (!isInitial) alert('⚠️ Insira o ID ou a URL da planilha primeiro.');
@@ -7366,10 +7368,31 @@
 
             const btn = document.querySelector('#modalConfigGoogleSheets .btn-primary');
             const originalText = btn.textContent;
-            btn.textContent = '⏳ Buscando colunas...';
+            btn.textContent = '⏳ Buscando dados...';
             btn.disabled = true;
 
             try {
+                // 1. Listar abas primeiro se não for carregamento inicial
+                if (!isInitial) {
+                    const sheetsResp = await fetch(`/api/google-sheets/list-sheets?spreadsheet_id=${spreadsheet_id}`);
+                    if (sheetsResp.ok) {
+                        const sheetsData = await sheetsResp.json();
+                        const sheetSelect = document.getElementById('gs_sheet_name');
+                        const currentVal = sheetSelect.value;
+                        sheetSelect.innerHTML = '';
+                        sheetsData.sheets.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s;
+                            opt.textContent = s;
+                            if (s === currentVal) opt.selected = true;
+                            sheetSelect.appendChild(opt);
+                        });
+                        // Atualiza o nome da aba para a selecionada ou a primeira da lista
+                        sheet_name = sheetSelect.value;
+                    }
+                }
+
+                // 2. Buscar cabeçalhos
                 const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${sheet_name}`);
                 const data = await response.json();
                 
@@ -7382,7 +7405,7 @@
                 if (!headers || headers.length === 0) throw new Error('Planilha vazia ou sem cabeçalhos na primeira linha.');
 
                 // Preencher os Selects de Mapeamento
-                const fields = ['cliente', 'data', 'valor', 'pedido'];
+                const fields = ['cliente', 'data', 'valor', 'pedido', 'erp'];
                 const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
                 const mapping = config.mapping || {};
 
@@ -7393,11 +7416,20 @@
                         const option = document.createElement('option');
                         option.value = h;
                         option.textContent = h;
-                        if (mapping[f === 'cliente' ? 'Cliente' : f === 'data' ? 'Data' : f === 'valor' ? 'Valor' : 'Pedido Haco'] === h) {
+                        
+                        // Lógica de mapeamento
+                        const mappingKey = f === 'cliente' ? 'Cliente' : f === 'data' ? 'Data' : f === 'valor' ? 'Valor' : f === 'pedido' ? 'Pedido Haco' : 'Código ERP';
+                        
+                        if (mapping[mappingKey] === h) {
                             option.selected = true;
-                        } else if (!mapping[f] && h.toLowerCase().includes(f)) {
-                           // Tenta auto-selecionar se o nome for parecido
-                           option.selected = true;
+                        } else if (!mapping[mappingKey]) {
+                            // Tenta auto-mapear se o nome for parecido
+                            const lowerH = h.toLowerCase();
+                            if (f === 'cliente' && (lowerH.includes('cliente') || lowerH.includes('nome'))) option.selected = true;
+                            if (f === 'data' && (lowerH.includes('data') || lowerH.includes('ajustada'))) option.selected = true;
+                            if (f === 'valor' && (lowerH.includes('valor') || lowerH.includes('total'))) option.selected = true;
+                            if (f === 'pedido' && (lowerH.includes('pedido') || lowerH.includes('item'))) option.selected = true;
+                            if (f === 'erp' && (lowerH.includes('erp') || lowerH.includes('código') || lowerH.includes('cd '))) option.selected = true;
                         }
                         select.appendChild(option);
                     });
@@ -7425,7 +7457,8 @@
                 'Cliente': document.getElementById('gs_map_cliente').value,
                 'Data': document.getElementById('gs_map_data').value,
                 'Valor': document.getElementById('gs_map_valor').value,
-                'Pedido Haco': document.getElementById('gs_map_pedido').value
+                'Pedido Haco': document.getElementById('gs_map_pedido').value,
+                'Código ERP': document.getElementById('gs_map_erp').value
             };
 
             if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
@@ -7689,8 +7722,12 @@
             </div>
 
             <div class="form-group">
-                <label>Nome da Aba (Sheet Name)</label>
-                <input type="text" id="gs_sheet_name" placeholder="Ex: Página1" value="Página1">
+                <label>🔔 Nome da Aba (Sheet Name)</label>
+                <div style="display: flex; gap: 10px;">
+                    <select id="gs_sheet_name" style="flex: 1;">
+                        <option value="Página1">Página1</option>
+                    </select>
+                </div>
             </div>
 
             <div id="gs_mapping_container" style="display: none; margin-top: 25px;">
@@ -7713,6 +7750,10 @@
                     <div class="mapping-item">
                         <label>📦 Pedido Haco (Opcional)</label>
                         <select id="gs_map_pedido"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>🆔 Código ERP (Opcional)</label>
+                        <select id="gs_map_erp"></select>
                     </div>
                 </div>
             </div>

@@ -111,6 +111,16 @@ def debug_google_sheets():
             
     return status
 
+@app.get("/api/google-sheets/list-sheets")
+def fetch_spreadsheet_sheets(spreadsheet_id: str):
+    """ Retorna a lista de nomes das abas da planilha """
+    try:
+        from .google_sheets import list_spreadsheet_sheets
+        sheets = list_spreadsheet_sheets(spreadsheet_id)
+        return {"sheets": sheets}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/google-sheets/sync")
 async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
     # O payload deve conter: spreadsheet_id, sheet_name, e mapping (ex: { 'Cliente': 'Coluna A', ... })
@@ -143,15 +153,25 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
         headers = data[0]
         rows = data[1:]
         
+        # Mapeamento interno amigável para o CRM
+        field_map = {
+            'Cliente': 'nomeCliente',
+            'Data': 'data',
+            'Valor': 'valor',
+            'Pedido Haco': 'pedido',
+            'Código ERP': 'erp'
+        }
+        
         # 2. Transforma em formato amigável para o CRM (lista de objetos)
         results = []
         for row in rows:
             entry = {}
-            for target_field, source_col_name in mapping.items():
-                if source_col_name in headers:
+            for config_field, source_col_name in mapping.items():
+                if source_col_name and source_col_name in headers:
                     col_index = headers.index(source_col_name)
                     if col_index < len(row):
-                        entry[target_field] = row[col_index]
+                        crm_field = field_map.get(config_field, config_field)
+                        entry[crm_field] = row[col_index]
             if entry:
                 results.append(entry)
 
