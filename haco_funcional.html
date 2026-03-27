@@ -555,6 +555,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <!-- SheetJS para leitura de planilhas Excel/CSV -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <!-- SIDEBAR MENU -->
@@ -800,7 +802,10 @@
                     </div>
                 </div>
 
-                <button class="btn-primary" onclick="salvarFaturamento()">✓ Registrar Faturamento</button>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 8px;">
+                    <button class="btn-primary" onclick="salvarFaturamento()">✓ Registrar Faturamento</button>
+                    <button class="btn-primary" onclick="abrirModalImportarPlanilha()" style="background: linear-gradient(135deg, #0e6e6e, #0a4d4d); display: flex; align-items: center; gap: 8px;">📥 Importar Planilha</button>
+                </div>
                 <div id="resultadoFaturamento" style="display: none; margin-top: 20px;"></div>
             </div>
         </div>
@@ -1282,6 +1287,81 @@
 
             <button class="btn-primary" onclick="salvarClienteEditado()">✓ Salvar Alterações</button>
             <button class="btn-danger" onclick="closeModalEditarCliente()" style="margin-left: 10px; background-color: #ccc; color: #333;">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: IMPORTAR PLANILHA DE FATURAMENTO -->
+    <div id="modalImportarPlanilha" class="modal" style="z-index: 10000;">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0a2540, #0e6e6e); color: white; border-radius: 8px 8px 0 0;">
+                <span style="display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px;">📥 Importar Faturamentos via Planilha</span>
+                <button class="modal-close" onclick="fecharModalImportarPlanilha()" style="color: white; font-size: 22px; background: rgba(255,255,255,0.15); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">&times;</button>
+            </div>
+
+            <!-- Instruções -->
+            <div style="padding: 18px 24px 0;">
+                <div style="background: rgba(14,110,110,0.08); border: 1px solid rgba(14,110,110,0.3); border-radius: 8px; padding: 14px 18px; font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                    <b style="color: var(--text-primary);">📋 Colunas esperadas na planilha:</b>
+                    <span style="display: inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+                        <span style="background: #dbeafe; color: #1d4ed8; padding: 2px 10px; border-radius: 12px; font-weight: 600;">Cliente</span>
+                        <span style="background: #dcfce7; color: #166534; padding: 2px 10px; border-radius: 12px; font-weight: 600;">Data</span>
+                        <span style="background: #fef9c3; color: #854d0e; padding: 2px 10px; border-radius: 12px; font-weight: 600;">Valor</span>
+                        <span style="background: #f3e8ff; color: #6b21a8; padding: 2px 10px; border-radius: 12px; font-weight: 600;">Pedido Haco <i>(opcional)</i></span>
+                    </span>
+                    <div style="margin-top: 8px;">Aceita arquivos <b>.xlsx</b>, <b>.xls</b> e <b>.csv</b>. A primeira linha deve ser o cabeçalho.</div>
+                </div>
+
+                <!-- Upload de Arquivo -->
+                <div id="importDropArea" style="border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 16px;"
+                    onclick="document.getElementById('inputPlanilha').click()"
+                    ondragover="importDragOver(event)" ondragleave="importDragLeave(event)" ondrop="importDrop(event)">
+                    <div style="font-size: 40px; margin-bottom: 10px;">📂</div>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Clique para selecionar ou arraste o arquivo aqui</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Arquivos suportados: .xlsx, .xls, .csv</div>
+                    <input type="file" id="inputPlanilha" accept=".xlsx,.xls,.csv" style="display: none;" onchange="processarArquivoPlanilha(this.files[0])">
+                </div>
+
+                <!-- Status do arquivo -->
+                <div id="importArquivoStatus" style="display: none; margin-bottom: 12px; padding: 10px 14px; border-radius: 7px; background: var(--light-bg); font-size: 13px; display: none; align-items: center; gap: 10px;">
+                    <span id="importArquivoNome" style="font-weight: 600;"></span>
+                    <span id="importArquivoLinhas" style="color: var(--text-secondary);"></span>
+                </div>
+
+                <!-- Preview da Tabela -->
+                <div id="importPreviewContainer" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0; font-size: 15px;">👀 Preview dos Dados</h3>
+                        <div style="display: flex; gap: 12px; font-size: 13px;">
+                            <span id="importContadorValidos" style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 12px; font-weight: 700;">✅ 0 válidos</span>
+                            <span id="importContadorInvalidos" style="background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 12px; font-weight: 700;">❌ 0 inválidos</span>
+                        </div>
+                    </div>
+                    <div style="overflow-x: auto; max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead style="position: sticky; top: 0; background: var(--bg-secondary); z-index: 1;">
+                                <tr>
+                                    <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 700;">Status</th>
+                                    <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 700;">Cliente</th>
+                                    <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 700;">Data</th>
+                                    <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 700;">Pedido Haco</th>
+                                    <th style="padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); font-weight: 700;">Valor (R$)</th>
+                                    <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 700;">Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="importPreviewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Resultado da Importação -->
+                <div id="importResultado" style="display: none; margin-top: 14px; padding: 14px 18px; border-radius: 8px;"></div>
+            </div>
+
+            <!-- Rodapé -->
+            <div style="padding: 16px 24px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--border); margin-top: 18px;">
+                <button onclick="fecharModalImportarPlanilha()" style="padding: 10px 22px; border: 1.5px solid var(--border); background: transparent; color: var(--text); border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 14px;">Cancelar</button>
+                <button id="btnConfirmarImport" onclick="confirmarImportacao()" disabled style="padding: 10px 28px; background: linear-gradient(135deg, #0a2540, #0e6e6e); color: white; border: none; border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 14px; opacity: 0.5; transition: opacity 0.2s;">✅ Confirmar Importação</button>
+            </div>
         </div>
     </div>
 
@@ -7016,6 +7096,269 @@
             doc.text('HACO RFID', mg, 13);
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(175, 220, 220);
             doc.text(numero + ' — continuação', W - mg, 13, { align: 'right' });
+        }
+
+        // ================================================================
+        // IMPORTAÇÃO DE PLANILHA DE FATURAMENTO
+        // ================================================================
+
+        let importDadosProcessados = [];
+
+        function abrirModalImportarPlanilha() {
+            document.getElementById('modalImportarPlanilha').classList.add('active');
+            resetarImportModal();
+        }
+
+        function fecharModalImportarPlanilha() {
+            document.getElementById('modalImportarPlanilha').classList.remove('active');
+            resetarImportModal();
+        }
+
+        function resetarImportModal() {
+            importDadosProcessados = [];
+            document.getElementById('inputPlanilha').value = '';
+            document.getElementById('importPreviewContainer').style.display = 'none';
+            document.getElementById('importResultado').style.display = 'none';
+            document.getElementById('importArquivoStatus').style.display = 'none';
+            const btn = document.getElementById('btnConfirmarImport');
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            const drop = document.getElementById('importDropArea');
+            drop.style.borderColor = 'var(--border)';
+            drop.style.background = '';
+        }
+
+        function importDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const drop = document.getElementById('importDropArea');
+            drop.style.borderColor = '#0e6e6e';
+            drop.style.background = 'rgba(14,110,110,0.05)';
+        }
+
+        function importDragLeave(e) {
+            const drop = document.getElementById('importDropArea');
+            drop.style.borderColor = 'var(--border)';
+            drop.style.background = '';
+        }
+
+        function importDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            importDragLeave(e);
+            const file = e.dataTransfer.files[0];
+            if (file) processarArquivoPlanilha(file);
+        }
+
+        function normalizarNomeColuna(nome) {
+            return (nome || '').toString().toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]/g, '');
+        }
+
+        function encontrarColuna(keys, candidatos) {
+            const normKeys = keys.map(k => ({ orig: k, norm: normalizarNomeColuna(k) }));
+            for (const c of candidatos) {
+                const nc = normalizarNomeColuna(c);
+                const found = normKeys.find(k => k.norm === nc || k.norm.includes(nc) || nc.includes(k.norm));
+                if (found) return found.orig;
+            }
+            return null;
+        }
+
+        function processarArquivoPlanilha(file) {
+            if (!file) return;
+            if (typeof XLSX === 'undefined') {
+                alert('Biblioteca SheetJS não carregada. Verifique sua conexão com a internet.');
+                return;
+            }
+
+            const statusDiv = document.getElementById('importArquivoStatus');
+            statusDiv.style.display = 'flex';
+            document.getElementById('importArquivoNome').textContent = '📄 ' + file.name;
+            document.getElementById('importArquivoLinhas').textContent = 'Processando...';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: '' });
+
+                    if (!rows || rows.length === 0) {
+                        alert('Planilha vazia ou sem dados válidos.');
+                        return;
+                    }
+
+                    const keys = Object.keys(rows[0]);
+                    const colCliente  = encontrarColuna(keys, ['cliente', 'conta', 'client', 'nome', 'razaosocial', 'empresa']);
+                    const colData     = encontrarColuna(keys, ['data', 'datafaturamento', 'date', 'data_faturamento']);
+                    const colValor    = encontrarColuna(keys, ['valor', 'value', 'valorfaturamento', 'valor_faturamento', 'total', 'montante']);
+                    const colPedido   = encontrarColuna(keys, ['pedido', 'pedidohaco', 'numeropedido', 'order', 'pedido_haco', 'haco']);
+
+                    if (!colCliente || !colData || !colValor) {
+                        alert(`Não encontrei as colunas obrigatórias.\n\nColunas encontradas: ${keys.join(', ')}\n\nA planilha deve ter colunas chamadas: Cliente, Data, Valor (e opcionalmente: Pedido Haco)`);
+                        return;
+                    }
+
+                    document.getElementById('importArquivoLinhas').textContent = `${rows.length} linha(s) encontrada(s) — Aba: ${sheetName}`;
+
+                    importDadosProcessados = rows.map((row, idx) => {
+                        const nomeCliente = (row[colCliente] || '').toString().trim();
+                        const dataRaw     = (row[colData] || '').toString().trim();
+                        const valorRaw    = (row[colValor] || '').toString().trim().replace(/[R$\s.]/g, '').replace(',', '.');
+                        const pedido      = colPedido ? (row[colPedido] || '').toString().trim() : '';
+
+                        // Normaliza data
+                        let dataISO = '';
+                        if (dataRaw) {
+                            // Tenta dd/mm/aaaa
+                            const partsBR = dataRaw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+                            if (partsBR) {
+                                const [, d, m, a] = partsBR;
+                                const ano = a.length === 2 ? '20' + a : a;
+                                dataISO = `${ano}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+                            } else if (/^\d{4}-\d{2}-\d{2}/.test(dataRaw)) {
+                                dataISO = dataRaw.substring(0, 10);
+                            } else {
+                                // Tenta parse genérico
+                                const d = new Date(dataRaw);
+                                if (!isNaN(d)) dataISO = d.toISOString().substring(0, 10);
+                            }
+                        }
+
+                        const valor = parseFloat(valorRaw);
+
+                        // Validação
+                        const erros = [];
+                        let erp = '';
+
+                        if (!nomeCliente) erros.push('Cliente vazio');
+                        if (!dataISO) erros.push('Data inválida: ' + dataRaw);
+                        if (isNaN(valor) || valor <= 0) erros.push('Valor inválido: ' + valorRaw);
+
+                        // Verifica se cliente existe (busca case-insensitive)
+                        if (nomeCliente) {
+                            const clienteKey = Object.keys(app.clientes).find(
+                                k => k.toLowerCase() === nomeCliente.toLowerCase()
+                            );
+                            if (clienteKey) {
+                                erp = app.clientes[clienteKey].erp || '';
+                                if (!erp) erros.push('Cliente sem código ERP');
+                            } else {
+                                erros.push('Cliente não cadastrado no CRM');
+                            }
+                        }
+
+                        return {
+                            idx,
+                            nomeCliente,
+                            dataISO,
+                            dataRaw,
+                            valor,
+                            pedido: pedido || '-',
+                            erp,
+                            valido: erros.length === 0,
+                            erros
+                        };
+                    });
+
+                    renderizarPreviewImport();
+
+                } catch (err) {
+                    console.error(err);
+                    alert('Erro ao processar o arquivo: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function renderizarPreviewImport() {
+            const validos   = importDadosProcessados.filter(r => r.valido).length;
+            const invalidos = importDadosProcessados.filter(r => !r.valido).length;
+
+            document.getElementById('importContadorValidos').textContent   = `✅ ${validos} válidos`;
+            document.getElementById('importContadorInvalidos').textContent = `❌ ${invalidos} inválidos`;
+
+            const tbody = document.getElementById('importPreviewBody');
+            tbody.innerHTML = importDadosProcessados.map(row => {
+                const cor = row.valido ? '' : 'background: rgba(239,68,68,0.06);';
+                const badge = row.valido
+                    ? `<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;">✅ OK</span>`
+                    : `<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;">❌ Erro</span>`;
+                const obs = row.erros.length ? row.erros.join('; ') : row.erp ? `ERP: ${row.erp}` : '';
+                const valorFmt = isNaN(row.valor) ? row.valor : row.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                return `<tr style="${cor}">
+                    <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${badge}</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;">${row.nomeCliente || '<em style="color:#9ca3af">vazio</em>'}</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${row.dataISO || row.dataRaw}</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text-secondary);">${row.pedido}</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;">R$ ${valorFmt}</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;color:${row.valido ? '#166534' : '#991b1b'};">${obs}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('importPreviewContainer').style.display = 'block';
+            document.getElementById('importResultado').style.display = 'none';
+
+            const btn = document.getElementById('btnConfirmarImport');
+            if (validos > 0) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.textContent = `✅ Importar ${validos} faturamento(s)`;
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                btn.textContent = '✅ Confirmar Importação';
+            }
+        }
+
+        function confirmarImportacao() {
+            const validos = importDadosProcessados.filter(r => r.valido);
+            if (validos.length === 0) return;
+
+            let inseridos = 0;
+            validos.forEach(row => {
+                // Captura o nome exato do cliente (preserva case do CRM)
+                const clienteKey = Object.keys(app.clientes).find(
+                    k => k.toLowerCase() === row.nomeCliente.toLowerCase()
+                ) || row.nomeCliente;
+
+                app.faturamentos.push({
+                    cliente: clienteKey,
+                    erp: row.erp,
+                    valor: row.valor,
+                    data: row.dataISO,
+                    pedidoHaco: row.pedido || '-'
+                });
+                inseridos++;
+            });
+
+            salvar();
+            atualizarDashboard();
+
+            const invalidos = importDadosProcessados.filter(r => !r.valido).length;
+            const resDiv = document.getElementById('importResultado');
+            resDiv.style.display = 'block';
+            resDiv.style.background = '#f0fdf4';
+            resDiv.style.border = '1px solid #86efac';
+            resDiv.style.color = '#166534';
+            resDiv.innerHTML = `
+                <div style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🎉 Importação concluída!</div>
+                <div>✅ <b>${inseridos}</b> faturamento(s) inserido(s) com sucesso.</div>
+                ${invalidos > 0 ? `<div style="margin-top: 4px; color: #991b1b;">❌ <b>${invalidos}</b> linha(s) ignorada(s) por erros.</div>` : ''}
+                <div style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">Os dados já foram salvos. Feche este modal para ver no Dashboard.</div>`;
+
+            const btn = document.getElementById('btnConfirmarImport');
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            btn.textContent = '✅ Importação realizada';
         }
 
     </script>
