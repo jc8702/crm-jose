@@ -85,7 +85,31 @@ def fetch_headers(spreadsheet_id: str, sheet_name: str = "Página1", db: Session
         headers = get_sheet_headers(spreadsheet_id, sheet_name)
         return {"headers": headers}
     except Exception as e:
+        # Passa o erro detalhado para o frontend
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/debug/google-sheets")
+def debug_google_sheets():
+    """ Verifica se as credenciais estão sendo lidas corretamente """
+    creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+    creds_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON_PATH")
+    
+    status = {
+        "has_json_env": bool(creds_json),
+        "has_path_env": bool(creds_path),
+        "path_exists": os.path.exists(creds_path) if creds_path else False,
+        "service_account_email": "Não carregado"
+    }
+    
+    if creds_json:
+        try:
+            import json
+            info = json.loads(creds_json)
+            status["service_account_email"] = info.get("client_email", "N/A")
+        except:
+            status["service_account_email"] = "ERRO AO PROCESSAR JSON"
+            
+    return status
 
 @app.post("/api/google-sheets/sync")
 async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
