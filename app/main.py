@@ -124,8 +124,18 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
     
     try:
         # 1. Busca todos os dados da planilha (Range A1:Z1000 por padrão)
-        range_name = f"'{sheet_name}'!A1:Z1000"
-        data = fetch_sheet_data(spreadsheet_id, range_name)
+        data = []
+        try:
+            range_name = f"'{sheet_name}'!A1:Z1000"
+            data = fetch_sheet_data(spreadsheet_id, range_name)
+        except Exception as e:
+            # Fallback para a primeira aba se a específica falhar
+            from .google_sheets import get_sheets_service
+            service = get_sheets_service()
+            metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            first_sheet_name = metadata['sheets'][0]['properties']['title']
+            range_name = f"'{first_sheet_name}'!A1:Z1000"
+            data = fetch_sheet_data(spreadsheet_id, range_name)
         
         if not data or len(data) < 2:
             return {"message": "Planilha vazia ou sem dados além do cabeçalho."}

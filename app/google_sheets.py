@@ -51,9 +51,30 @@ def fetch_sheet_data(spreadsheet_id, range_name):
         raise e
 
 def get_sheet_headers(spreadsheet_id, sheet_name="Página1"):
-    """ Retorna apenas a primeira linha (cabeçalhos) para mapeamento. """
-    range_name = f"'{sheet_name}'!A1:Z1"
-    values = fetch_sheet_data(spreadsheet_id, range_name)
-    if values and len(values) > 0:
-        return values[0]
+    """ Retorna apenas a primeira linha (cabeçalhos) para mapeamento. Fallback para a primeira aba se falhar. """
+    service = get_sheets_service()
+    if not service:
+        raise RuntimeError("Serviço do Google Sheets não disponível (faltam credenciais).")
+
+    try:
+        # Tenta com o nome fornecido
+        range_name = f"'{sheet_name}'!A1:Z1"
+        values = fetch_sheet_data(spreadsheet_id, range_name)
+        if values and len(values) > 0:
+            return values[0]
+    except Exception as e:
+        logger.warning(f"Erro ao buscar aba '{sheet_name}'. Tentando a primeira aba por padrão. Erro: {str(e)}")
+        
+    # Se falhar ou não encontrar, busca o nome da primeira aba do Spreadsheet
+    try:
+        metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        first_sheet_name = metadata['sheets'][0]['properties']['title']
+        range_name = f"'{first_sheet_name}'!A1:Z1"
+        values = fetch_sheet_data(spreadsheet_id, range_name)
+        if values and len(values) > 0:
+            return values[0]
+    except Exception as e:
+        logger.error(f"Erro final ao buscar cabeçalhos do Google Sheets {spreadsheet_id}: {str(e)}")
+        raise e
+
     return []
