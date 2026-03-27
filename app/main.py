@@ -10,8 +10,7 @@ from typing import List
 from . import models, schemas
 from .database import engine, get_db
 
-# Cria as tabelas no arquivo SQLite se não existirem
-models.Base.metadata.create_all(bind=engine)
+#models.Base.metadata.create_all(bind=engine)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -31,6 +30,15 @@ def crm_legado():
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
+
+@app.get("/debug/db")
+def debug_db(db: Session = Depends(get_db)):
+    try:
+        # Tenta executar uma consulta simples para validar a conexão e versão
+        result = db.execute(models.sqlalchemy.text("SELECT version();")).fetchone()
+        return {"database": str(result[0])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro na conexão com o banco: {str(e)}")
 
 # --- API Endpoints ---
 

@@ -1,26 +1,38 @@
 import os
+import logging
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Lê a URL da nuvem. Se não existir (rodando no seu PC), usa o SQLite local.
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./crm_database.db")
+# Configuração de logging básico para o banco
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("app.database")
 
-# O PostgreSQL da nuvem pode ter "postgres://" mas o SQLAlchemy atual exige "postgresql://"
-if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# 1. Tornar DATABASE_URL obrigatório (Removendo fallback SQLite)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Se estiver usando postgresql, recomenda-se o driver pg8000 para estabilidade
-if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
-    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
+if not DATABASE_URL:
+    logger.error("ERRO CRITICAL: DATABASE_URL não configurada nas variáveis de ambiente.")
+    raise RuntimeError("DATABASE_URL não configurado. O CRM exige PostgreSQL para persistência segura.")
 
-# SQLite config requires connect_args, Postgres does not.
-if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-    )
-else:
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# 2. Ajustar compatibilidade com PostgreSQL (Render/Heroku/Neon usam postgres://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Logar informações da conexão (sem expor a senha)
+try:
+    from urllib.parse import urlparse
+    parsed = urlparse(DATABASE_URL)
+    logger.info(f"Conectando ao banco de dados: {parsed.scheme} em {parsed.hostname}")
+except Exception:
+    logger.info("Conectando ao banco de dados configurado via DATABASE_URL")
+
+# 3. Melhorar configuração do engine para produção
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verifica se a conexão ainda é válida antes de usar
+    pool_size=5,         # Quantidade de conexões mantidas no pool
+    max_overflow=10      # Quantidade extra de conexões se o pool estiver cheio
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
