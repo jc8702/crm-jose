@@ -44,7 +44,7 @@ def fetch_sheet_data(spreadsheet_id, range_name):
     
     try:
         sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheet_id=spreadsheet_id, range=range_name).execute()
+        result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
         return result.get('values', [])
     except Exception as e:
         logger.error(f"Erro ao buscar planilha {spreadsheet_id}: {str(e)}")
