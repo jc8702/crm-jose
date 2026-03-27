@@ -7330,6 +7330,13 @@
         // GOOGLE SHEETS SYNC FUNCTIONS
         // ================================================================
         
+        function extrairSpreadsheetId(valor) {
+            if (!valor) return '';
+            // Se for uma URL completa, extrai o ID entre /d/ e /edit
+            const match = valor.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            return match ? match[1] : valor.trim();
+        }
+
         function abrirConfigGoogleSheets() {
             document.getElementById('modalConfigGoogleSheets').classList.add('active');
             const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
@@ -7346,13 +7353,16 @@
         }
 
         async function buscarColunasGoogleSheets(isInitial = false) {
-            const spreadsheet_id = document.getElementById('gs_spreadsheet_id').value.trim();
+            let spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
             const sheet_name = document.getElementById('gs_sheet_name').value.trim();
             
             if (!spreadsheet_id) {
-                if (!isInitial) alert('⚠️ Insira o ID da planilha primeiro.');
+                if (!isInitial) alert('⚠️ Insira o ID ou a URL da planilha primeiro.');
                 return;
             }
+
+            // Atualiza o campo com o ID limpo
+            document.getElementById('gs_spreadsheet_id').value = spreadsheet_id;
 
             const btn = document.querySelector('#modalConfigGoogleSheets .btn-primary');
             const originalText = btn.textContent;
@@ -7402,8 +7412,11 @@
         }
 
         function salvarConfigGoogleSheets() {
-            const spreadsheet_id = document.getElementById('gs_spreadsheet_id').value.trim();
+            const spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
             const sheet_name = document.getElementById('gs_sheet_name').value.trim();
+            
+            // Atualiza o campo com o ID limpo
+            document.getElementById('gs_spreadsheet_id').value = spreadsheet_id;
             
             const mapping = {
                 'Cliente': document.getElementById('gs_map_cliente').value,
