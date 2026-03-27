@@ -8,14 +8,25 @@ logger = logging.getLogger("app.google_sheets")
 def get_sheets_service():
     """ Obter o serviço da API do Google Sheets. Prioriza Conta de Serviço se existir. """
     creds_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON_PATH")
+    creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
     
-    if creds_path and os.path.exists(creds_path):
-        creds = service_account.Credentials.from_service_account_file(
-            creds_path, scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
-        )
-    else:
+    creds = None
+    try:
+        if creds_json:
+            import json
+            creds_info = json.loads(creds_json)
+            creds = service_account.Credentials.from_service_account_info(
+                creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+            )
+        elif creds_path and os.path.exists(creds_path):
+            creds = service_account.Credentials.from_service_account_file(
+                creds_path, scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+            )
+    except Exception as e:
+        logger.error(f"Erro ao carregar credenciais do Google: {str(e)}")
+
+    if not creds:
         # Se não houver credenciais, tenta acesso público via API Key se configurada
-        # (Nota: Planilhas do Google exigem autenticação para a maioria das operações via API v4)
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
             return build('sheets', 'v4', developerKey=api_key)
