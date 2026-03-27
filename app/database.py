@@ -10,6 +10,10 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./crm_database.db
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Se estiver usando postgresql, recomenda-se o driver pg8000 para estabilidade
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
+
 # SQLite config requires connect_args, Postgres does not.
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(

@@ -1,3 +1,6 @@
+import datetime
+import json
+import os
 from pathlib import Path
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -83,6 +86,6 @@ async def save_sync_state(request: Request, db: Session = Depends(get_db)):
         db.add(state)
     else:
         state.data = data
-        state.updated_at = __import__("datetime").datetime.utcnow()
+        state.updated_at = datetime.datetime.utcnow()
     db.commit()
     return {"message": "Sincronizado com sucesso!"}
