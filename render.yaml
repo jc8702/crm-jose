@@ -7,6 +7,6 @@ services:
     startCommand: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
     envVars:
       - key: DATABASE_URL
-        placeholder: "Crie seu banco no Neon.tech e cole a URL aqui"
+        value: "COLE_AQUI_SUA_URL_DO_NEON"
       - key: PYTHON_VERSION
         value: 3.11.0
