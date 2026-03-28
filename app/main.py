@@ -160,7 +160,12 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
             'Data': 'data',
             'Valor': 'valor',
             'Pedido Haco': 'pedido',
-            'Código ERP': 'erp'
+            'Código ERP': 'erp',
+            'Vendedor': 'vendedor',
+            'Nota Fiscal': 'notaFiscal',
+            'Código Etiqueta': 'codigoEtiqueta',
+            'Status Pedido': 'statusPedido',
+            'Data Entrega': 'dataEntrega'
         }
         
         # 2. Transforma em formato amigável para o CRM (lista de objetos)

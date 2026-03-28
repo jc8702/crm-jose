@@ -745,21 +745,28 @@
                     </div>
                 </div>
                 
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Pedido Haco</th>
-                            <th>Cliente</th>
-                            <th>Cód. ERP</th>
-                            <th>Valor</th>
-                            <th>Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabelaFaturamentosDetalhados">
-                        <tr><td colspan="5" style="text-align: center;">Nenhum faturamento inserido neste mês</td></tr>
-                    </tbody>
-                </table>
+                <div style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border);">
+                    <table style="min-width: 1200px;">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Pedido Haco</th>
+                                <th>Cliente</th>
+                                <th>Cód. ERP</th>
+                                <th>Valor</th>
+                                <th>Vendedor</th>
+                                <th>NF</th>
+                                <th>Etiqueta</th>
+                                <th>Status.</th>
+                                <th>Entrega</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaFaturamentosDetalhados">
+                            <tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido neste mês</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -1402,6 +1409,32 @@
                 <div class="form-group">
                     <label>Valor (R$)</label>
                     <input type="number" id="valorFaturamentoEditar" placeholder="0.00" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Vendedor</label>
+                    <input type="text" id="vendedorFaturamentoEditar" placeholder="Nome do vendedor">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Nota Fiscal</label>
+                    <input type="text" id="notaFaturamentoEditar" placeholder="Ex: 000.123.456">
+                </div>
+                <div class="form-group">
+                    <label>Cód. Etiqueta</label>
+                    <input type="text" id="etiquetaFaturamentoEditar" placeholder="Ex: ABC-123">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Status do Pedido</label>
+                    <input type="text" id="statusPedFaturamentoEditar" placeholder="Ex: Em trânsito">
+                </div>
+                <div class="form-group">
+                    <label>Data de Entrega</label>
+                    <input type="date" id="entregaFaturamentoEditar">
                 </div>
             </div>
 
@@ -3167,7 +3200,7 @@
             document.getElementById('tituloFaturamentosDetalhados').textContent = `Faturamentos Inseridos - Ano Completo 2026`;
 
             if (app.faturamentos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Nenhum faturamento inserido</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido</td></tr>';
             } else {
                 const totalFaturado = app.faturamentos
                     .filter(f => (f.statusFaturado || 'pendente') === 'sim')
@@ -3185,6 +3218,11 @@
                         <td>${f.cliente}</td>
                         <td><strong>${erp || '-'}</strong></td>
                         <td>R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td>${f.vendedor || '-'}</td>
+                        <td>${f.notaFiscal || '-'}</td>
+                        <td>${f.codigoEtiqueta || '-'}</td>
+                        <td style="font-size:12px">${f.statusPedido || '-'}</td>
+                        <td>${f.dataEntrega ? (isNaN(new Date(f.dataEntrega)) ? f.dataEntrega : new Date(f.dataEntrega).toLocaleDateString('pt-BR')) : '-'}</td>
                         <td style="display: flex; gap: 10px; align-items: center;">
                             <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 14px;">
                                 <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pendente</option>
@@ -3201,7 +3239,7 @@
                 tbody.innerHTML += `
                     <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
                         <td colspan="4" style="text-align: right;">TOTAL:</td>
-                        <td colspan="2">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td colspan="6">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                 `;
             }
@@ -3558,7 +3596,7 @@
             document.getElementById('tituloFaturamentosDetalhados').textContent = titulo;
 
             if (faturamentosFiltrados.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum faturamento encontrado com os filtros aplicados</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento encontrado com os filtros aplicados</td></tr>';
             } else {
                 const totalFaturado = faturamentosFiltrados
                     .filter(f => (f.statusFaturado || 'pendente') === 'sim')
@@ -3576,6 +3614,11 @@
                         <td>${f.cliente}</td>
                         <td><strong>${erp || '-'}</strong></td>
                         <td>R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td>${f.vendedor || '-'}</td>
+                        <td>${f.notaFiscal || '-'}</td>
+                        <td>${f.codigoEtiqueta || '-'}</td>
+                        <td style="font-size:11px">${f.statusPedido || '-'}</td>
+                        <td>${f.dataEntrega ? (isNaN(new Date(f.dataEntrega)) ? f.dataEntrega : new Date(f.dataEntrega).toLocaleDateString('pt-BR')) : '-'}</td>
                         <td style="display: flex; gap: 10px; align-items: center;">
                             <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 14px;">
                                 <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pendente</option>
@@ -3591,7 +3634,7 @@
                 tbody.innerHTML += `
                     <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
                         <td colspan="4" style="text-align: right;">TOTAL:</td>
-                        <td colspan="2">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td colspan="6">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                 `;
             }
@@ -3641,7 +3684,18 @@
                 return;
             }
 
-            app.faturamentos.push({cliente, erp, valor, data, pedidoHaco: pedidoHaco || '-'});
+            app.faturamentos.push({
+                cliente, 
+                erp, 
+                valor, 
+                data, 
+                pedidoHaco: pedidoHaco || '-',
+                vendedor: '-',
+                notaFiscal: '-',
+                codigoEtiqueta: '-',
+                statusPedido: 'pendente',
+                dataEntrega: '-'
+            });
             salvar();
             atualizarDashboard();
 
@@ -3801,6 +3855,12 @@
             document.getElementById('dataFaturamentoEditar').value = fat.data;
             document.getElementById('pedidoHacoEditar').value = fat.pedidoHaco || '';
             document.getElementById('valorFaturamentoEditar').value = fat.valor;
+            document.getElementById('vendedorFaturamentoEditar').value = fat.vendedor || '';
+            document.getElementById('notaFaturamentoEditar').value = fat.notaFiscal || '';
+            document.getElementById('etiquetaFaturamentoEditar').value = fat.codigoEtiqueta || '';
+            document.getElementById('statusPedFaturamentoEditar').value = fat.statusPedido || '';
+            document.getElementById('entregaFaturamentoEditar').value = fat.dataEntrega || '';
+            
             document.getElementById('modalEditarFaturamento').classList.add('active');
         }
 
@@ -3815,15 +3875,25 @@
             const data = document.getElementById('dataFaturamentoEditar').value;
             const pedidoHaco = document.getElementById('pedidoHacoEditar').value;
             const valor = parseFloat(document.getElementById('valorFaturamentoEditar').value);
+            const vendedor = document.getElementById('vendedorFaturamentoEditar').value;
+            const notaFiscal = document.getElementById('notaFaturamentoEditar').value;
+            const codigoEtiqueta = document.getElementById('etiquetaFaturamentoEditar').value;
+            const statusPedido = document.getElementById('statusPedFaturamentoEditar').value;
+            const dataEntrega = document.getElementById('entregaFaturamentoEditar').value;
 
             if (!data || !valor) {
-                alert('Preencha todos os campos');
+                alert('Preencha os campos obrigatórios (Data e Valor)');
                 return;
             }
 
             app.faturamentos[faturamentoEmEdicao].data = data;
             app.faturamentos[faturamentoEmEdicao].pedidoHaco = pedidoHaco || '-';
             app.faturamentos[faturamentoEmEdicao].valor = valor;
+            app.faturamentos[faturamentoEmEdicao].vendedor = vendedor;
+            app.faturamentos[faturamentoEmEdicao].notaFiscal = notaFiscal;
+            app.faturamentos[faturamentoEmEdicao].codigoEtiqueta = codigoEtiqueta;
+            app.faturamentos[faturamentoEmEdicao].statusPedido = statusPedido;
+            app.faturamentos[faturamentoEmEdicao].dataEntrega = dataEntrega;
             
             salvar();
             atualizarDashboard();
@@ -7290,12 +7360,13 @@
                 if (!headers || headers.length === 0) throw new Error('Planilha vazia ou sem cabeçalhos na primeira linha.');
 
                 // Preencher os Selects de Mapeamento
-                const fields = ['cliente', 'data', 'valor', 'pedido', 'erp'];
+                const fields = ['cliente', 'data', 'valor', 'pedido', 'erp', 'vendedor', 'nota', 'etiqueta', 'status_ped', 'entrega'];
                 const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
                 const mapping = config.mapping || {};
 
                 fields.forEach(f => {
                     const select = document.getElementById(`gs_map_${f}`);
+                    if (!select) return;
                     select.innerHTML = '<option value="">-- Selecione uma coluna --</option>';
                     headers.forEach(h => {
                         const option = document.createElement('option');
@@ -7303,7 +7374,11 @@
                         option.textContent = h;
                         
                         // Lógica de mapeamento
-                        const mappingKey = f === 'cliente' ? 'Cliente' : f === 'data' ? 'Data' : f === 'valor' ? 'Valor' : f === 'pedido' ? 'Pedido Haco' : 'Código ERP';
+                        const labelMap = {
+                            'cliente': 'Cliente', 'data': 'Data', 'valor': 'Valor', 'pedido': 'Pedido Haco', 'erp': 'Código ERP',
+                            'vendedor': 'Vendedor', 'nota': 'Nota Fiscal', 'etiqueta': 'Código Etiqueta', 'status_ped': 'Status Pedido', 'entrega': 'Data Entrega'
+                        };
+                        const mappingKey = labelMap[f];
                         
                         if (mapping[mappingKey] === h) {
                             option.selected = true;
@@ -7315,6 +7390,11 @@
                             if (f === 'valor' && (lowerH.includes('valor') || lowerH.includes('total'))) option.selected = true;
                             if (f === 'pedido' && (lowerH.includes('pedido') || lowerH.includes('item'))) option.selected = true;
                             if (f === 'erp' && (lowerH.includes('erp') || lowerH.includes('código') || lowerH.includes('cd '))) option.selected = true;
+                            if (f === 'vendedor' && (lowerH.includes('vendedor') || lowerH.includes('vend'))) option.selected = true;
+                            if (f === 'nota' && (lowerH.includes('nota') || lowerH.includes('nf'))) option.selected = true;
+                            if (f === 'etiqueta' && (lowerH.includes('etiqueta') || lowerH.includes('tag'))) option.selected = true;
+                            if (f === 'status_ped' && (lowerH.includes('status'))) option.selected = true;
+                            if (f === 'entrega' && (lowerH.includes('entrega') || lowerH.includes('entre'))) option.selected = true;
                         }
                         select.appendChild(option);
                     });
@@ -7343,7 +7423,12 @@
                 'Data': document.getElementById('gs_map_data').value,
                 'Valor': document.getElementById('gs_map_valor').value,
                 'Pedido Haco': document.getElementById('gs_map_pedido').value,
-                'Código ERP': document.getElementById('gs_map_erp').value
+                'Código ERP': document.getElementById('gs_map_erp').value,
+                'Vendedor': document.getElementById('gs_map_vendedor').value,
+                'Nota Fiscal': document.getElementById('gs_map_nota').value,
+                'Código Etiqueta': document.getElementById('gs_map_etiqueta').value,
+                'Status Pedido': document.getElementById('gs_map_status_ped').value,
+                'Data Entrega': document.getElementById('gs_map_entrega').value
             };
 
             if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
@@ -7396,9 +7481,14 @@
                             app.faturamentos.push({
                                 cliente: clienteKey,
                                 erp: app.clientes[clienteKey]?.erp || '',
-                                valor: parseFloat(item['Valor']),
-                                data: item['Data'],
-                                pedidoHaco: item['Pedido Haco'] || '-'
+                                valor: parseFloat(item['valor']),
+                                data: item['data'],
+                                pedidoHaco: item['pedido'] || '-',
+                                vendedor: item['vendedor'] || '-',
+                                notaFiscal: item['notaFiscal'] || '-',
+                                codigoEtiqueta: item['codigoEtiqueta'] || '-',
+                                statusPedido: item['statusPedido'] || '-',
+                                dataEntrega: item['dataEntrega'] || '-'
                             });
                             novos++;
                         }
@@ -7639,6 +7729,26 @@
                     <div class="mapping-item">
                         <label>🆔 Código ERP (Opcional)</label>
                         <select id="gs_map_erp"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>👤 Vendedor</label>
+                        <select id="gs_map_vendedor"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>🧾 Nota Fiscal</label>
+                        <select id="gs_map_nota"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>🏷️ Cód. Etiqueta</label>
+                        <select id="gs_map_etiqueta"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>⚙️ Status Pedido</label>
+                        <select id="gs_map_status_ped"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>🚚 Data de Entrega</label>
+                        <select id="gs_map_entrega"></select>
                     </div>
                 </div>
             </div>
