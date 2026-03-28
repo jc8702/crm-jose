@@ -3257,6 +3257,8 @@
 
             if (app.faturamentos.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido</td></tr>';
+                document.getElementById('paginacaoFaturamentoContainer').innerHTML = '';
+            } else {
                 const totalFaturado = app.faturamentos
                     .filter(f => (f.statusFaturado || 'pendente') === 'sim')
                     .reduce((sum, f) => sum + f.valor, 0);
@@ -3304,7 +3306,7 @@
                 `;
 
                 // Renderiza controles de página
-                renderizarControlesPaginacao(totalItens, 'atualizarTabelaFaturamentosAno');
+                renderizarControlesPaginacao(totalItens, atualizarTabelaFaturamentosAno);
             }
         }
 
@@ -3710,16 +3712,23 @@
                 `;
 
                 // Renderiza controles de página
-                renderizarControlesPaginacao(totalItens, 'renderizarTabelaComFiltro', JSON.stringify([mes, clienteFiltro, buscaPedido, filtroStatus, dataInicial, dataFinal]));
+                const _mesAtual = mes, _cliAtual = clienteFiltro, _busAtual = buscaPedido, _stAtual = filtroStatus, _diAtual = dataInicial, _dfAtual = dataFinal;
+                renderizarControlesPaginacao(totalItens, () => renderizarTabelaComFiltro(_mesAtual, _cliAtual, _busAtual, _stAtual, _diAtual, _dfAtual));
             }
         }
 
         // ================================================================
         // PAGINAÇÃO DASHBOARD
         // ================================================================
-        function renderizarControlesPaginacao(totalItens, callbackNome, params) {
+        // Estado salvo da última chamada para re-renderizar ao mudar de página
+        let _paginacaoCallbackAtual = null;
+
+        function renderizarControlesPaginacao(totalItens, callbackFn) {
             const container = document.getElementById('paginacaoFaturamentoContainer');
             if (!container) return;
+
+            // Salva o callback para uso em mudarPaginaFaturamento
+            _paginacaoCallbackAtual = callbackFn;
             
             const totalPaginas = Math.ceil(totalItens / app.itensPorPagina);
             if (totalPaginas <= 1) {
@@ -3727,37 +3736,38 @@
                 return;
             }
 
-            let html = `
-                <button class="page-btn" ${app.paginaFaturamentoAtual === 1 ? 'disabled' : ''} onclick="mudarPaginaFaturamento(${app.paginaFaturamentoAtual - 1}, '${callbackNome}', ${params})">❮</button>
-                <div class="page-info">Página <b>${app.paginaFaturamentoAtual}</b> de <b>${totalPaginas}</b></div>
-            `;
+            const atual = app.paginaFaturamentoAtual;
+
+            let html = `<div class="pagination-container">`;
+            html += `<button class="page-btn" ${atual === 1 ? 'disabled' : ''} onclick="mudarPaginaFaturamento(${atual - 1})">❮</button>`;
 
             // Mostrar até 5 páginas ao redor da atual
-            let start = Math.max(1, app.paginaFaturamentoAtual - 2);
+            let start = Math.max(1, atual - 2);
             let end = Math.min(totalPaginas, start + 4);
             if (end - start < 4) start = Math.max(1, end - 4);
 
             for (let i = start; i <= end; i++) {
-                html += `<button class="page-btn ${i === app.paginaFaturamentoAtual ? 'active' : ''}" onclick="mudarPaginaFaturamento(${i}, '${callbackNome}', ${params})">${i}</button>`;
+                html += `<button class="page-btn ${i === atual ? 'active' : ''}" onclick="mudarPaginaFaturamento(${i})">${i}</button>`;
             }
 
-            html += `<button class="page-btn" ${app.paginaFaturamentoAtual === totalPaginas ? 'disabled' : ''} onclick="mudarPaginaFaturamento(${app.paginaFaturamentoAtual + 1}, '${callbackNome}', ${params})">❯</button>`;
+            html += `<div class="page-info">Página <b>${atual}</b> de <b>${totalPaginas}</b></div>`;
+            html += `<button class="page-btn" ${atual === totalPaginas ? 'disabled' : ''} onclick="mudarPaginaFaturamento(${atual + 1})">❯</button>`;
+            html += `</div>`;
             
             container.innerHTML = html;
         }
 
-        function mudarPaginaFaturamento(novaPagina, callbackNome, params) {
+        function mudarPaginaFaturamento(novaPagina) {
             app.paginaFaturamentoAtual = novaPagina;
             
-            // Re-executa a função original com os mesmos parâmetros
-            if (callbackNome === 'renderizarTabelaComFiltro') {
-                renderizarTabelaComFiltro(...params);
-            } else if (callbackNome === 'atualizarTabelaFaturamentosAno') {
-                atualizarTabelaFaturamentosAno();
+            // Re-executa o callback armazenado
+            if (typeof _paginacaoCallbackAtual === 'function') {
+                _paginacaoCallbackAtual();
             }
 
             // Scroll suave para o topo da tabela
-            document.getElementById('tituloFaturamentosDetalhados').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const titulo = document.getElementById('tituloFaturamentosDetalhados');
+            if (titulo) titulo.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function preencherClientesFaturamento() {
