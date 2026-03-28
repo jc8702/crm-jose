@@ -7382,9 +7382,9 @@
                         
                         if (mapping[mappingKey] === h) {
                             option.selected = true;
-                        } else if (!mapping[mappingKey]) {
+                        } else if (!mapping[mappingKey] && h) {
                             // Tenta auto-mapear se o nome for parecido
-                            const lowerH = h.toLowerCase();
+                            const lowerH = h.toString().toLowerCase();
                             if (f === 'cliente' && (lowerH.includes('cliente') || lowerH.includes('nome'))) option.selected = true;
                             if (f === 'data' && (lowerH.includes('data') || lowerH.includes('ajustada'))) option.selected = true;
                             if (f === 'valor' && (lowerH.includes('valor') || lowerH.includes('total'))) option.selected = true;
@@ -7475,7 +7475,7 @@
                         if (!jaExiste) {
                             // Procura o cliente exato no CRM
                             const clienteKey = Object.keys(app.clientes).find(
-                                k => k.toLowerCase() === item['Cliente'].toLowerCase()
+                                k => (item['Cliente'] || '').toString().toLowerCase() === k.toLowerCase()
                             ) || item['Cliente'];
 
                             app.faturamentos.push({
@@ -7516,7 +7516,7 @@
             validos.forEach(row => {
                 // Captura o nome exato do cliente (preserva case do CRM)
                 const clienteKey = Object.keys(app.clientes).find(
-                    k => k.toLowerCase() === row.nomeCliente.toLowerCase()
+                    k => (row.nomeCliente || '').toString().toLowerCase() === k.toLowerCase()
                 ) || row.nomeCliente;
 
                 app.faturamentos.push({
