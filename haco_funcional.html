@@ -800,20 +800,20 @@
                 </div>
                 
                 <div style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border); padding-bottom: 8px;">
-                    <table style="min-width: 1450px;">
+                    <table class="tabela" style="min-width: 1050px;">
                         <thead>
                             <tr>
-                                <th style="width: 80px;">Data</th>
-                                <th style="width: 100px;">Pedido Haco</th>
-                                <th style="min-width: 180px;">Cliente</th>
-                                <th style="width: 90px;">Cód. ERP</th>
-                                <th style="width: 110px;">Valor</th>
-                                <th style="min-width: 160px;">Vendedor</th>
-                                <th style="width: 80px;">NF</th>
-                                <th style="width: 100px;">Etiqueta</th>
-                                <th style="width: 90px;">Status.</th>
-                                <th style="width: 80px;">Entrega</th>
-                                <th style="width: 260px; text-align: center;">Ação</th>
+                                <th>Data</th>
+                                <th>Pedido Haco</th>
+                                <th>Cliente</th>
+                                <th>Cód. ERP</th>
+                                <th>Valor</th>
+                                <th>Vendedor</th>
+                                <th>NF</th>
+                                <th>Etiqueta</th>
+                                <th>Status.</th>
+                                <th>Entrega</th>
+                                <th style="text-align: center; white-space: nowrap;">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaFaturamentosDetalhados">
@@ -3258,7 +3258,7 @@
             if (!dataStr) return '-';
             const s = String(dataStr).trim();
             if (s.includes('/') && s.split('/')[0].length <= 2) {
-                return s.split(' ')[0]; // Já está em DD/MM/... e evita exibir a hora
+                return s.split(/\s+/)[0]; // Já está em DD/MM/... Usa Regex para cobrir espaços e quebras de linha
             }
             const d = new Date(s + 'T12:00:00'); // Evita timezone offset
             if (!isNaN(d)) return d.toLocaleDateString('pt-BR');
@@ -3294,10 +3294,10 @@
                     <tr>
                         <td>${formatarDataVisao(f.data)}</td>
                         <td><strong>${f.pedidoHaco || '-'}</strong></td>
-                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;" title="${f.cliente}">${f.cliente}</td>
+                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;" title="${f.cliente}">${f.cliente}</td>
                         <td><strong>${erp || '-'}</strong></td>
                         <td style="white-space: nowrap;">R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                        <td style="white-space: nowrap;">${f.vendedor || '-'}</td>
+                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${f.vendedor}">${f.vendedor || '-'}</td>
                         <td>${f.notaFiscal || '-'}</td>
                         <td>${f.codigoEtiqueta || '-'}</td>
                         <td style="font-size:12px">${f.statusPedido || '-'}</td>
