@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import gc
 from pathlib import Path
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -217,6 +218,7 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
             if entry:
                 results.append(entry)
 
+        gc.collect()
         return {
             "message": f"Sincronizados {len(results)} registros com sucesso!",
             "data": results,
