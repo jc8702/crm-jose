@@ -557,12 +557,8 @@
     #fabContagem{background:#e74c3c;color:#fff;border-radius:50%;width:22px;height:22px;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     </style>
 
-    <!-- Firebase SDK (compat - necessário para sintaxe firebase.xxx) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <!-- SheetJS para leitura de planilhas Excel/CSV -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <title>HACO RFID CRM - Gestão de Carteira</title>
 </head>
 <body>
     <!-- SIDEBAR MENU -->
@@ -596,17 +592,16 @@
             <button style="width: 100%; padding: 10px; background: rgba(74, 158, 255, 0.2); color: #4a9eff; border: 1px solid rgba(74, 158, 255, 0.5); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.3s;" onclick="importarDados()" onmouseover="this.style.background='rgba(74, 158, 255, 0.3)'" onmouseout="this.style.background='rgba(74, 158, 255, 0.2)'">📂 Importar Dados</button>
         </div>
 
-        <!-- STATUS FIREBASE -->
+        <!-- STATUS SINCRONIZAÇÃO -->
         <div style="margin-top: 16px; padding: 0 15px 20px;">
-            <div style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 10px; font-weight: 600; letter-spacing: 0.5px;">☁️ Firebase</div>
+            <div style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 10px; font-weight: 600; letter-spacing: 0.5px;">☁️ Sincronização</div>
             <div id="fbStatusCard" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; font-size: 12px;">
                 <div style="display:flex; align-items:center; gap:7px; margin-bottom:6px;">
                     <span id="fbDot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0;transition:background .4s;box-shadow:0 0 0 0 transparent"></span>
                     <span id="fbStatusTxt" style="color:rgba(255,255,255,0.7);font-weight:600;">Conectando...</span>
                 </div>
-                <div id="fbSyncTxt" style="color:rgba(255,255,255,0.4);font-size:11px;">Aguardando sincronização</div>
-                <div id="fbUserTxt" style="color:rgba(255,255,255,0.3);font-size:10px;margin-top:4px;font-family:monospace;word-break:break-all;display:none"></div>
-                <button onclick="fazerBackupLocal(true)" style="margin-top:8px;width:100%;padding:6px;background:rgba(14,110,110,0.3);border:1px solid rgba(14,110,110,0.5);color:#5dd8d8;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:background .2s" onmouseover="this.style.background='rgba(14,110,110,0.5)'" onmouseout="this.style.background='rgba(14,110,110,0.3)'">🔄 Sincronizar com Banco Local</button>
+                <div id="fbSyncTxt" style="color:rgba(255,255,255,0.4);font-size:11px;">Aguardando banco de dados</div>
+                <button onclick="fazerBackupLocal(true)" style="margin-top:8px;width:100%;padding:6px;background:rgba(14,110,110,0.3);border:1px solid rgba(14,110,110,0.5);color:#5dd8d8;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:background .2s" onmouseover="this.style.background='rgba(14,110,110,0.5)'" onmouseout="this.style.background='rgba(14,110,110,0.3)'">🔄 Sincronizar com Nuvem</button>
             </div>
         </div>
     </div>
@@ -2571,18 +2566,21 @@
             projetoEmTransicao: null
         };
 
-        // Se não há clientes salvos, carrega os padrões uma única vez
-        if (Object.keys(app.clientes).length === 0) {
-            Object.assign(app.clientes, clientesComErp);
-        }
-
-        if (app.faturamentos.length === 0) {
-            app.faturamentos = [
-                {cliente: "Grendene", erp: "493090", valor: 78100, data: "2026-01-15"},
-                {cliente: "Vulcabras", erp: "251429", valor: 59400, data: "2026-01-20"},
-                {cliente: "Jane Kelly (Star Jane)", erp: "81974", valor: 58100, data: "2026-02-05"},
-                {cliente: "Miss Bel", erp: "813702", valor: 26400, data: "2026-03-01"}
-            ];
+        // Inicializa dados padrão apenas se for a primeira vez que o sistema é aberto
+        if (!localStorage.getItem('crm_inicializado')) {
+            if (Object.keys(app.clientes).length === 0) {
+                Object.assign(app.clientes, clientesComErp);
+            }
+            if (app.faturamentos.length === 0) {
+                app.faturamentos = [
+                    {cliente: "Grendene", erp: "493090", valor: 78100, data: "2026-01-15"},
+                    {cliente: "Vulcabras", erp: "251429", valor: 59400, data: "2026-01-20"},
+                    {cliente: "Jane Kelly (Star Jane)", erp: "81974", valor: 58100, data: "2026-02-05"},
+                    {cliente: "Miss Bel", erp: "813702", valor: 26400, data: "2026-03-01"}
+                ];
+            }
+            localStorage.setItem('crm_inicializado', 'true');
+            salvar(); // Salva os padrões iniciais no banco local
         }
 
         function salvar() {
@@ -2592,153 +2590,24 @@
             localStorage.setItem('clientes', JSON.stringify(app.clientes));
             localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
             localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes || []));
-            // Sincroniza com SQLite local a cada salvar (debounced)
-            clearTimeout(window._fbSyncTimer);
-            window._fbSyncTimer = setTimeout(() => fazerBackupLocal(false), 1500);
+            
+            // Sincroniza com SQLite local IMEDIATAMENTE (sem debounce)
+            fazerBackupLocal(false);
         }
 
-        // ===== FIREBASE CONFIGURATION =====
-        const firebaseConfig = {
-            apiKey: "AIzaSyBkNTet1iLoo-y3OabjuCg_t-ElvwTI4mQ",
-            authDomain: "haco-rfid.firebaseapp.com",
-            projectId: "haco-rfid",
-            storageBucket: "haco-rfid.firebasestorage.app",
-            messagingSenderId: "327470773367",
-            appId: "1:327470773367:web:4adcf63605673704ea4272",
-            measurementId: "G-3NX8E089H1",
-            databaseURL: "https://haco-rfid-default-rtdb.firebaseio.com"
-        };
-
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        let usuarioId = null;
-
-        // ===== FIREBASE FUNCTIONS =====
+        // ===== STATUS DO BANCO SQL =====
         function _fbSetStatus(estado, msg, detalhe) {
             const dot   = document.getElementById('fbDot');
             const txt   = document.getElementById('fbStatusTxt');
             const sync  = document.getElementById('fbSyncTxt');
-            const user  = document.getElementById('fbUserTxt');
             if (!dot) return;
             const cores = { conectando:'#f59e0b', conectado:'#22c55e', erro:'#ef4444', sincronizando:'#3b82f6' };
-            const pulso = { conectado:'0 0 0 4px rgba(34,197,94,0.25)', sincronizando:'0 0 0 4px rgba(59,130,246,0.25)' };
             dot.style.background  = cores[estado] || '#6b7280';
-            dot.style.boxShadow   = pulso[estado] || '0 0 0 0 transparent';
             txt.textContent       = msg;
-            if (detalhe) {
+            if (detalhe && sync) {
                 sync.textContent  = detalhe.slice(0, 60) + (detalhe.length > 60 ? '…' : '');
-                sync.title        = detalhe; // tooltip com mensagem completa
+                sync.title        = detalhe;
             }
-            if (usuarioId && user) {
-                user.style.display  = 'block';
-                user.textContent    = 'UID: ' + usuarioId.slice(0, 20) + (usuarioId.length > 20 ? '…' : '');
-            }
-        }
-
-        async function inicializarFirebase() {
-            _fbSetStatus('conectando', 'Conectando...', 'Verificando conexão...');
-
-            // Testa se o Firebase SDK carregou
-            if (typeof firebase === 'undefined') {
-                _fbSetStatus('erro', '❌ SDK não carregou', 'Sem internet ou CDN bloqueado');
-                return;
-            }
-
-            // Usa UID fixo baseado no nome do projeto (sem precisar de Auth anônimo)
-            // Isso funciona desde que as regras do DB permitam leitura/escrita
-            usuarioId = 'jose_haco_rfid_2026';
-
-            try {
-                // Tenta primeiro com autenticação anônima
-                const auth = firebase.auth();
-                const result = await auth.signInAnonymously();
-                usuarioId = result.user.uid;
-                console.log('✅ Firebase Auth OK:', usuarioId);
-            } catch (authError) {
-                // Auth anônimo desabilitado? Usa UID fixo mesmo assim
-                console.warn('⚠️ Auth anônimo indisponível, usando UID fixo:', authError.code);
-                // usuarioId já definido acima como fixo
-            }
-
-            // Testa conexão real com o banco
-            try {
-                _fbSetStatus('conectando', 'Conectando...', 'Testando banco de dados...');
-                await database.ref(`usuarios/${usuarioId}/ping`).set(Date.now());
-                console.log('✅ Firebase DB OK, UID:', usuarioId);
-                _fbSetStatus('conectado', '✅ Conectado', 'Carregando dados da nuvem...');
-                carregarDadosDoFirebase();
-            } catch (dbError) {
-                console.error('❌ Firebase DB erro:', dbError);
-                const motivo = dbError.code === 'PERMISSION_DENIED'
-                    ? 'Permissão negada — abra o Firebase Console e ajuste as Regras do Realtime Database para: { "rules": { ".read": true, ".write": true } }'
-                    : 'Erro: ' + (dbError.message || dbError.code || 'desconhecido');
-                _fbSetStatus('erro', '❌ Banco inacessível', motivo);
-            }
-        }
-
-        function salvarDadosFirebase(chave, dados) {
-            if (!usuarioId) return;
-            database.ref(`usuarios/${usuarioId}/${chave}`).set(dados).catch(err => console.error(err));
-        }
-
-        function carregarDadosDoFirebase() {
-            if (!usuarioId) return;
-            database.ref(`usuarios/${usuarioId}`).on('value', (snapshot) => {
-                const dados = snapshot.val();
-                if (dados) {
-                    if (dados.faturamentos) localStorage.setItem('faturamentos', JSON.stringify(dados.faturamentos));
-                    if (dados.clientes) localStorage.setItem('clientes', JSON.stringify(dados.clientes));
-                    if (dados.projetos) localStorage.setItem('projetos', JSON.stringify(dados.projetos));
-                    if (dados.visitas) localStorage.setItem('visitas', JSON.stringify(dados.visitas));
-                    if (dados.oportunidades) localStorage.setItem('oportunidades', JSON.stringify(dados.oportunidades));
-                    if (dados.visitasReunioes) localStorage.setItem('visitasReunioes', JSON.stringify(dados.visitasReunioes));
-                    const agora = new Date().toLocaleTimeString('pt-BR');
-                    _fbSetStatus('conectado', '✅ Conectado', '☁️ Dados carregados às ' + agora);
-                } else {
-                    _fbSetStatus('conectado', '✅ Conectado', '☁️ Nuvem vazia — aguardando dados');
-                }
-            });
-        }
-
-        function sincronizarComFirebase(manual) {
-            // Garante que manual é boolean (setInterval passa número)
-            manual = manual === true;
-            if (!usuarioId) {
-                if (manual) alert('⚠️ Firebase ainda não conectado. Aguarde alguns segundos e tente novamente.');
-                return;
-            }
-            _fbSetStatus('sincronizando', '🔄 Sincronizando...', 'Enviando dados para nuvem');
-
-            // Usa app object diretamente (dados mais atualizados)
-            const payload = {
-                faturamentos:   app.faturamentos || [],
-                clientes:       app.clientes || {},
-                projetos:       app.projetos || [],
-                visitas:        app.visitas || [],
-                oportunidades:  app.oportunidades || [],
-                visitasReunioes: app.visitasReunioes || [],
-                ultimoSync:     new Date().toISOString()
-            };
-
-            database.ref(`usuarios/${usuarioId}`).set(payload)
-                .then(() => {
-                    const agora = new Date().toLocaleTimeString('pt-BR');
-                    _fbSetStatus('conectado', '✅ Sincronizado', '☁️ Último sync: ' + agora);
-                    if (manual) {
-                        const dot = document.getElementById('fbDot');
-                        if (dot) {
-                            dot.style.transition = 'transform 0.15s';
-                            dot.style.transform = 'scale(1.8)';
-                            setTimeout(() => dot.style.transform = 'scale(1)', 250);
-                        }
-                    }
-                })
-                .catch(err => {
-                    console.error('Firebase sync error:', err);
-                    _fbSetStatus('erro', '❌ Falha no sync', 'Verifique conexão: ' + (err.message || '').slice(0, 35));
-                    if (manual) alert('❌ Erro ao sincronizar:\n' + (err.message || err));
-                });
         }
 
         // ===== PRODUTOS RFID (70 produtos) =====
@@ -6689,11 +6558,11 @@
                         app.oportunidades = dados.oportunidades || [];
                         app.visitasReunioes = dados.visitasReunioes || [];
                         
-                        _dbSetStatus('conectado', '✅ API SQLite');
+                        _dbSetStatus('conectado', '✅ Banco de Dados ON');
                         atualizarDashboard();
                     } else {
                         _dbSetStatus('conectado', '✅ DB Novo');
-                        // Se não tem banco, salva os dados default que estão em memória no SQLite!
+                        // Se não tem banco, salva os dados default que estão em memória no Servidor!
                         fazerBackupLocal(false);
                     }
                 }
@@ -6733,9 +6602,6 @@
             atualizarClientesCarteira();
             renderCalendarVisitas();
             inicializarConsulta();
-
-            // Sincronizar com Firebase a cada 30 segundos (backup periódico)
-            setInterval(() => sincronizarComFirebase(false), 30000);
         });
 
         // ═══════════════════════════════════════════════════════════
