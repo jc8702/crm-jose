@@ -130,29 +130,42 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
     sheet_name = body.get("sheet_name", "Página1")
     mapping = body.get("mapping", {})
     
+    skip = body.get("skip")
+    limit = body.get("limit")
+
     if not spreadsheet_id or not mapping:
         raise HTTPException(status_code=400, detail="Faltam parâmetros de configuração.")
     
     try:
-        # 1. Busca todos os dados da planilha (Range A1:Z1000 por padrão)
-        data = []
+        # 1. Busca os cabeçalhos (linha 1)
+        headers = []
         try:
-            range_name = f"'{sheet_name}'!A1:Z1000"
-            data = fetch_sheet_data(spreadsheet_id, range_name)
+            head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
+            if head_data: headers = head_data[0]
         except Exception as e:
-            # Fallback para a primeira aba se a específica falhar
+            # Fallback para a primeira aba
             from .google_sheets import get_sheets_service
             service = get_sheets_service()
             metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-            first_sheet_name = metadata['sheets'][0]['properties']['title']
-            range_name = f"'{first_sheet_name}'!A1:Z1000"
-            data = fetch_sheet_data(spreadsheet_id, range_name)
+            sheet_name = metadata['sheets'][0]['properties']['title']
+            head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
+            if head_data: headers = head_data[0]
         
-        if not data or len(data) < 2:
-            return {"message": "Planilha vazia ou sem dados além do cabeçalho."}
+        if not headers:
+            return {"message": "Planilha vazia ou sem cabeçalho."}
 
-        headers = data[0]
-        rows = data[1:]
+        # 2. Busca os dados paginados
+        if skip and limit:
+            # se skip=2, limit=500 -> A2:Z501
+            # Importante: o frontend deve garantir startRow >= 2
+            start_row = max(2, int(skip))
+            range_name = f"'{sheet_name}'!A{start_row}:Z{start_row + int(limit) - 1}"
+        else:
+            # Fallback retrocompatível (1000 linhas)
+            range_name = f"'{sheet_name}'!A2:Z1001"
+
+        data = fetch_sheet_data(spreadsheet_id, range_name)
+        rows = data if data else []
         
         # Mapeamento interno amigável para o CRM
         field_map = {

@@ -3933,7 +3933,7 @@
                 });
             }
 
-            app.clientes[nomeNovo] = {erp, cidade, estado, recorrencia};
+            app.clientes[nomeNovo] = {erp, cidade, estado, recorrencia, pre_cadastro: false};
             preencherClientesFaturamento();
             preencherClientesAgendamento();
             atualizarTabelaClientes();
@@ -3968,11 +3968,17 @@
             if (clientes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Nenhum cliente cadastrado</td></tr>';
             } else {
-                tbody.innerHTML = clientes.map(([nome, dados], idx) => `
-                    <tr>
+                tbody.innerHTML = clientes.map(([nome, dados], idx) => {
+                    const rowBg = dados.pre_cadastro ? 'background-color: #fff3cd;' : '';
+                    const alertIcon = dados.pre_cadastro ? '<span title="Pré-cadastro: complete as informações" style="cursor:help;">⚠️</span> ' : '';
+                    const btnLabel = dados.pre_cadastro ? '📝 Completar' : 'Editar';
+                    const erpDisplay = dados.erp || '<span style="color:#d32f2f; font-size:11px;">Sem ERP</span>';
+                    
+                    return `
+                    <tr style="${rowBg}">
                         <td style="font-weight: 600; text-align: center; width: 40px;">${idx + 1}</td>
-                        <td>${nome}</td>
-                        <td><strong>${dados.erp}</strong></td>
+                        <td>${alertIcon}${nome}</td>
+                        <td><strong>${erpDisplay}</strong></td>
                         <td>${dados.cidade}</td>
                         <td>${dados.estado}</td>
                         <td>
@@ -3981,11 +3987,12 @@
                                 : `<span style="color:var(--text-muted);font-size:12px;">Por histórico</span>`}
                         </td>
                         <td style="display: flex; gap: 10px;">
-                            <button class="btn-success" onclick="abrirModalEditarCliente('${nome.replace(/'/g,"\\'")}')">Editar</button>
+                            <button class="btn-success" onclick="abrirModalEditarCliente('${nome.replace(/'/g,"\\'")}')">${btnLabel}</button>
                             <button class="btn-danger" onclick="deletarCliente('${nome.replace(/'/g,"\\'")}')">Deletar</button>
                         </td>
                     </tr>
-                `).join('');
+                    `;
+                }).join('');
 
                 tbody.innerHTML += `
                     <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
@@ -7759,51 +7766,109 @@
             }
 
             const btn = document.querySelector('button[onclick="sincronizarGoogleSheets()"]');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '⏳ Sincronizando...';
-            btn.disabled = true;
+            const originalText = btn ? btn.innerHTML : 'Sincronizar Lotes';
+            if (btn) btn.disabled = true;
 
             try {
-                const response = await fetch('/api/google-sheets/sync', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
+                let skip = 2; // Começa na linha 2 (ignorando header naturo)
+                const limit = 500;
+                let hasMore = true;
+                
+                let totalNovos = 0;
+                let totalIgnorados = 0;
+                let clientesCriados = 0;
+                
+                // Backup do estado local (RAM) antes de alterar
+                const snapshotFaturamentos = JSON.stringify(app.faturamentos);
+                const snapshotClientes = JSON.stringify(app.clientes);
 
-                if (!response.ok) throw new Error('Falha na sincronização com o banco de dados.');
-                
-                const result = await response.json();
-                
-                if (result.data && result.data.length > 0) {
-                    // Adicionar novos faturamentos (evitando duplicatas simples por Pedido Haco se existir)
-                    let novos = 0;
+                while (hasMore) {
+                    if (btn) btn.innerHTML = `⏳ Importando linhas ${skip} a ${skip + limit - 1}...`;
+                    
+                    const payload = { ...config, skip, limit };
+
+                    const response = await fetch('/api/google-sheets/sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error(`Falha na API (status: ${response.status})`);
+                    
+                    const result = await response.json();
+                    
+                    if (!result.data || result.data.length === 0) {
+                        hasMore = false;
+                        break;
+                    }
+                    
                     result.data.forEach(item => {
-                        const jaExiste = item['Pedido Haco'] !== '-' && app.faturamentos.some(f => f.pedidoHaco === item['Pedido Haco']);
+                        // python retorna 'pedido' para 'Pedido Haco'
+                        const pedidoHacoItem = item.pedido || '-';
+                        const jaExiste = pedidoHacoItem !== '-' && app.faturamentos.some(f => f.pedidoHaco === pedidoHacoItem);
+                        
                         if (!jaExiste) {
-                            // Procura o cliente exato no CRM
-                            const clienteKey = Object.keys(app.clientes).find(
-                                k => (item['Cliente'] || '').toString().toLowerCase() === k.toLowerCase()
-                            ) || item['Cliente'];
+                            // Python retorna 'nomeCliente' para 'Cliente'
+                            const nomeOriginal = item.nomeCliente || 'Desconhecido';
+                            
+                            let clienteKey = Object.keys(app.clientes).find(
+                                k => nomeOriginal.toString().toLowerCase() === k.toLowerCase()
+                            );
+                            
+                            if (!clienteKey) {
+                                // Auto-cadastro: cliente novo detectado
+                                clienteKey = nomeOriginal;
+                                app.clientes[clienteKey] = {
+                                    erp: item.erp || '',
+                                    cidade: 'Importado',
+                                    estado: 'A definir',
+                                    recorrencia: '',
+                                    pre_cadastro: true
+                                };
+                                clientesCriados++;
+                            }
 
                             app.faturamentos.push({
                                 cliente: clienteKey,
-                                erp: app.clientes[clienteKey]?.erp || '',
-                                valor: parseFloat(item['valor']),
-                                data: item['data'],
-                                pedidoHaco: item['pedido'] || '-',
-                                vendedor: item['vendedor'] || '-',
-                                notaFiscal: item['notaFiscal'] || '-',
-                                codigoEtiqueta: item['codigoEtiqueta'] || '-',
-                                statusPedido: item['statusPedido'] || '-',
-                                dataEntrega: item['dataEntrega'] || '-'
+                                erp: item.erp || app.clientes[clienteKey]?.erp || '',
+                                valor: parseFloat(item.valor || 0),
+                                data: item.data || '',
+                                pedidoHaco: pedidoHacoItem,
+                                vendedor: item.vendedor || '-',
+                                notaFiscal: item.notaFiscal || '-',
+                                codigoEtiqueta: item.codigoEtiqueta || '-',
+                                statusPedido: item.statusPedido || '-',
+                                dataEntrega: item.dataEntrega || '-'
                             });
-                            novos++;
+                            totalNovos++;
+                        } else {
+                            totalIgnorados++;
                         }
                     });
+                    
+                    // Condição de parada: se vieram menos itens que o limite
+                    if (result.data.length < limit) {
+                        hasMore = false;
+                    } else {
+                        skip += limit;
+                    }
+                }
 
-                    salvar();
-                    atualizarDashboard();
-                    alert(`✅ Sincronização concluída!\n\n${novos} novos faturamentos importados.\n${result.data.length - novos} duplicatas ignoradas.`);
+                if (totalNovos > 0 || clientesCriados > 0) {
+                    if (btn) btn.innerHTML = `⏳ Salvando na Nuvem...`;
+                    try {
+                        await salvar(); // Apenas 1 request para o Neon (Opção A)
+                        atualizarDashboard();
+                        preencherClientesFaturamento();
+                        preencherClientesAgendamento();
+                        atualizarTabelaClientes();
+                        alert(`✅ Sincronização concluída!\n\n${totalNovos} faturamentos importados.\n${clientesCriados} clientes pré-cadastrados.\n${totalIgnorados} ignorados.`);
+                    } catch (errSave) {
+                        // Rollback em memória
+                        app.faturamentos = JSON.parse(snapshotFaturamentos);
+                        app.clientes = JSON.parse(snapshotClientes);
+                        throw new Error('Erro ao persistir. ' + errSave.message);
+                    }
                 } else {
                     alert('ℹ️ Nenhuns dados novos encontrados na planilha.');
                 }
@@ -7811,8 +7876,10 @@
             } catch (err) {
                 alert('❌ Erro na sincronização: ' + err.message);
             } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
             }
         }
         function confirmarImportacao() {
