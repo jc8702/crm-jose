@@ -7296,6 +7296,7 @@
             document.getElementById('modalConfigGoogleSheets').classList.add('active');
             const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
             document.getElementById('gs_spreadsheet_id').value = config.spreadsheet_id || '';
+            document.getElementById('gs_filter_vendedor').value = config.vendedor_filter || '';
             
             const sheetSelect = document.getElementById('gs_sheet_name');
             sheetSelect.innerHTML = `<option value="${config.sheet_name || 'Página1'}">${config.sheet_name || 'Página1'}</option>`;
@@ -7431,12 +7432,14 @@
                 'Data Entrega': document.getElementById('gs_map_entrega').value
             };
 
+            const vendedor_filter = document.getElementById('gs_filter_vendedor').value.trim();
+
             if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
                 alert('⚠️ Preencha o ID da planilha e mapeie pelo menos Cliente, Data e Valor.');
                 return;
             }
 
-            const config = { spreadsheet_id, sheet_name, mapping };
+            const config = { spreadsheet_id, sheet_name, mapping, vendedor_filter };
             localStorage.setItem('haco_gsheets_config', JSON.stringify(config));
             
             alert('✅ Configuração do Google Sheets salva com sucesso!');
@@ -7750,6 +7753,12 @@
                         <label>🚚 Data de Entrega</label>
                         <select id="gs_map_entrega"></select>
                     </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: rgba(14,110,110,0.05); border: 1.5px solid rgba(14,110,110,0.2); border-radius: 8px;">
+                    <label style="font-weight: 700; display: block; margin-bottom: 6px; color: #0e6e6e;">🎯 Filtrar por Vendedor Padrão (Opcional)</label>
+                    <input type="text" id="gs_filter_vendedor" placeholder="Nome do vendedor como na planilha (ex: JOSÉ CARLOS)" style="width: 100%; border: 1.5px solid var(--border); padding: 10px; border-radius: 6px;">
+                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">Se preenchido, apenas os dados deste vendedor serão importados.</small>
                 </div>
             </div>
 

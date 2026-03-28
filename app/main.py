@@ -170,14 +170,27 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
         
         # 2. Transforma em formato amigável para o CRM (lista de objetos)
         results = []
+        filtro_vendedor = body.get("vendedor_filter")
+        
         for row in rows:
             entry = {}
             for config_field, source_col_name in mapping.items():
                 if source_col_name and source_col_name in headers:
-                    col_index = headers.index(source_col_name)
-                    if col_index < len(row):
-                        crm_field = field_map.get(config_field, config_field)
-                        entry[crm_field] = row[col_index]
+                    try:
+                        col_index = headers.index(source_col_name)
+                        if col_index < len(row):
+                            crm_field = field_map.get(config_field, config_field)
+                            entry[crm_field] = row[col_index]
+                    except ValueError:
+                        continue
+            
+            # Aplicar filtro de vendedor se definido
+            if entry and filtro_vendedor:
+                vend_valor = str(entry.get('vendedor', '')).strip().lower()
+                filtro_valor = str(filtro_vendedor).strip().lower()
+                if vend_valor != filtro_valor:
+                    continue
+                    
             if entry:
                 results.append(entry)
 
