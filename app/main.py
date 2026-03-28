@@ -127,12 +127,16 @@ _header_cache = {}
 
 @app.post("/api/google-sheets/sync")
 async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
-    # O payload deve conter: spreadsheet_id, sheet_name, e mapping (ex: { 'Cliente': 'Coluna A', ... })
     body = await request.json()
     spreadsheet_id = body.get("spreadsheet_id")
-    sheet_name = body.get("sheet_name", "Página1")
-    mapping = body.get("mapping", {})
     
+    # We will accept either a single string (sheet_name) or a list of strings (sheet_names)
+    sheet_names = body.get("sheet_names")
+    if not sheet_names:
+        single_sheet = body.get("sheet_name", "Página1")
+        sheet_names = [single_sheet]
+        
+    mapping = body.get("mapping", {})
     skip = body.get("skip")
     limit = body.get("limit")
 
@@ -140,89 +144,88 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Faltam parâmetros de configuração.")
     
     global _header_cache
-    cache_key = f"{spreadsheet_id}_{sheet_name}"
     
+    results = []
+    total_fetched = 0
+    filtro_vendedor = body.get("vendedor_filter")
+    
+    # Mapeamento interno amigável para o CRM
+    field_map = {
+        'Cliente': 'nomeCliente',
+        'Data': 'data',
+        'Valor': 'valor',
+        'Pedido Haco': 'pedido',
+        'Código ERP': 'erp',
+        'Vendedor': 'vendedor',
+        'Nota Fiscal': 'notaFiscal',
+        'Código Etiqueta': 'codigoEtiqueta',
+        'Status Pedido': 'statusPedido',
+        'Data Entrega': 'dataEntrega'
+    }
+
     try:
-        # 1. Busca os cabeçalhos (linha 1) com cache para não sobrecarregar API em paginação
-        headers = _header_cache.get(cache_key, [])
-        if not headers:
-            try:
-                head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
-                if head_data: 
-                    headers = head_data[0]
-                    _header_cache[cache_key] = headers
-            except Exception as e:
-                # Fallback para a primeira aba
-                from .google_sheets import get_sheets_service
-                service = get_sheets_service()
-                metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-                sheet_name = metadata['sheets'][0]['properties']['title']
-                head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
-                if head_data: 
-                    headers = head_data[0]
-                    _header_cache[cache_key] = headers
-        
-        if not headers:
-            return {"message": "Planilha vazia ou sem cabeçalho."}
-
-        # 2. Busca os dados paginados
-        if skip and limit:
-            # se skip=2, limit=500 -> A2:Z501
-            # Importante: o frontend deve garantir startRow >= 2
-            start_row = max(2, int(skip))
-            range_name = f"'{sheet_name}'!A{start_row}:Z{start_row + int(limit) - 1}"
-        else:
-            # Fallback retrocompatível (1000 linhas)
-            range_name = f"'{sheet_name}'!A2:Z1001"
-
-        data = fetch_sheet_data(spreadsheet_id, range_name)
-        rows = data if data else []
-        
-        # Mapeamento interno amigável para o CRM
-        field_map = {
-            'Cliente': 'nomeCliente',
-            'Data': 'data',
-            'Valor': 'valor',
-            'Pedido Haco': 'pedido',
-            'Código ERP': 'erp',
-            'Vendedor': 'vendedor',
-            'Nota Fiscal': 'notaFiscal',
-            'Código Etiqueta': 'codigoEtiqueta',
-            'Status Pedido': 'statusPedido',
-            'Data Entrega': 'dataEntrega'
-        }
-        
-        # 2. Transforma em formato amigável para o CRM (lista de objetos)
-        results = []
-        filtro_vendedor = body.get("vendedor_filter")
-        
-        for row in rows:
-            entry = {}
-            for config_field, source_col_name in mapping.items():
-                if source_col_name and source_col_name in headers:
-                    try:
-                        col_index = headers.index(source_col_name)
-                        if col_index < len(row):
-                            crm_field = field_map.get(config_field, config_field)
-                            entry[crm_field] = row[col_index]
-                    except ValueError:
-                        continue
+        for sheet_name in sheet_names:
+            cache_key = f"{spreadsheet_id}_{sheet_name}"
+            headers = _header_cache.get(cache_key, [])
             
-            # Aplicar filtro de vendedor se definido
-            if entry and filtro_vendedor:
-                vend_valor = str(entry.get('vendedor', '')).strip().lower()
-                filtro_valor = str(filtro_vendedor).strip().lower()
-                if vend_valor != filtro_valor:
-                    continue
-                    
-            if entry:
-                results.append(entry)
+            if not headers:
+                try:
+                    head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
+                    if head_data: 
+                        headers = head_data[0]
+                        _header_cache[cache_key] = headers
+                except Exception as e:
+                    # Fallback para a primeira aba original da planilha se a lida diretamente falhar
+                    from .google_sheets import get_sheets_service
+                    service = get_sheets_service()
+                    metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+                    first_sheet = metadata['sheets'][0]['properties']['title']
+                    head_data = fetch_sheet_data(spreadsheet_id, f"'{first_sheet}'!A1:Z1")
+                    if head_data: 
+                        headers = head_data[0]
+                        _header_cache[cache_key] = headers
+            
+            if not headers:
+                continue # Pula abas vazias ou sem leitura com sucesso pra n quebrar a próxima
+
+            if skip and limit:
+                start_row = max(2, int(skip))
+                range_name = f"'{sheet_name}'!A{start_row}:Z{start_row + int(limit) - 1}"
+            else:
+                range_name = f"'{sheet_name}'!A2:Z1001"
+
+            data = fetch_sheet_data(spreadsheet_id, range_name)
+            rows = data if data else []
+            total_fetched += len(rows)
+
+            for row in rows:
+                entry = {}
+                for config_field, source_col_name in mapping.items():
+                    if source_col_name and source_col_name in headers:
+                        try:
+                            col_index = headers.index(source_col_name)
+                            if col_index < len(row):
+                                crm_field = field_map.get(config_field, config_field)
+                                entry[crm_field] = row[col_index]
+                        except ValueError:
+                            continue
+                
+                # Aplicar filtro de vendedor se definido
+                if entry and filtro_vendedor:
+                    vend_valor = str(entry.get('vendedor', '')).strip().lower()
+                    filtro_valor = str(filtro_vendedor).strip().lower()
+                    if vend_valor != filtro_valor:
+                        continue
+                        
+                if entry:
+                    entry['abaGoogleSheets'] = sheet_name
+                    results.append(entry)
 
         gc.collect()
         return {
             "message": f"Sincronizados {len(results)} registros com sucesso!",
             "data": results,
-            "fetched_count": len(rows)
+            "fetched_count": total_fetched
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na sincronização: {str(e)}")

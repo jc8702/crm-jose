@@ -7361,6 +7361,7 @@
         // ================================================================
 
         let importDadosProcessados = [];
+        let globalWorkbook = null;
 
         function abrirModalImportarPlanilha() {
             document.getElementById('modalImportarPlanilha').classList.add('active');
@@ -7427,8 +7428,6 @@
             }
             return null;
         }
-
-        let globalWorkbook = null;
 
         function processarArquivoPlanilha(file) {
             if (!file) return;
@@ -7634,157 +7633,13 @@
             document.getElementById('importPreviewContainer').style.display = 'block';
             document.getElementById('importResultado').style.display = 'none';
 
-            const btn = document.getElementById('btnConfirmarImport');
-            if (validos > 0) {
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-                btn.textContent = `✅ Importar ${validos} faturamento(s)`;
-            } else {
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                btn.style.cursor = 'not-allowed';
-                btn.textContent = '✅ Confirmar Importação';
-            }
-        }
 
-        // ================================================================
-        // GOOGLE SHEETS SYNC FUNCTIONS
-        // ================================================================
-        
-        function extrairSpreadsheetId(valor) {
-            if (!valor) return '';
-            // Se for uma URL completa, extrai o ID entre /d/ e /edit
-            const match = valor.match(/\/d\/([a-zA-Z0-9-_]+)/);
-            return match ? match[1] : valor.trim();
-        }
-
-        function abrirConfigGoogleSheets() {
-            document.getElementById('modalConfigGoogleSheets').classList.add('active');
-            const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
-            document.getElementById('gs_spreadsheet_id').value = config.spreadsheet_id || '';
-            document.getElementById('gs_filter_vendedor').value = config.vendedor_filter || '';
-            document.getElementById('gs_auto_sync').checked = !!config.auto_sync;
-            atualizarToggleVisual(!!config.auto_sync);
-            
-            const sheetSelect = document.getElementById('gs_sheet_name');
-            sheetSelect.innerHTML = `<option value="${config.sheet_name || 'Página1'}">${config.sheet_name || 'Página1'}</option>`;
-            
-            if (config.spreadsheet_id) {
-                buscarColunasGoogleSheets(true);
-            }
-        }
-
-        function fecharConfigGoogleSheets() {
-            document.getElementById('modalConfigGoogleSheets').classList.remove('active');
-        }
-
-        async function buscarColunasGoogleSheets(isInitial = false) {
-            let spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
-            let sheet_name = document.getElementById('gs_sheet_name').value;
-            
-            if (!spreadsheet_id) {
-                if (!isInitial) alert('⚠️ Insira o ID ou a URL da planilha primeiro.');
-                return;
-            }
-
-            // Atualiza o campo com o ID limpo
-            document.getElementById('gs_spreadsheet_id').value = spreadsheet_id;
-
-            const btn = document.querySelector('#modalConfigGoogleSheets .btn-primary');
-            const originalText = btn.textContent;
-            btn.textContent = '⏳ Buscando dados...';
-            btn.disabled = true;
-
-            try {
-                // 1. Listar abas primeiro se não for carregamento inicial
-                if (!isInitial) {
-                    const sheetsResp = await fetch(`/api/google-sheets/list-sheets?spreadsheet_id=${spreadsheet_id}`);
-                    if (sheetsResp.ok) {
-                        const sheetsData = await sheetsResp.json();
-                        const sheetSelect = document.getElementById('gs_sheet_name');
-                        const currentVal = sheetSelect.value;
-                        sheetSelect.innerHTML = '';
-                        sheetsData.sheets.forEach(s => {
-                            const opt = document.createElement('option');
-                            opt.value = s;
-                            opt.textContent = s;
-                            if (s === currentVal) opt.selected = true;
-                            sheetSelect.appendChild(opt);
-                        });
-                        // Atualiza o nome da aba para a selecionada ou a primeira da lista
-                        sheet_name = sheetSelect.value;
-                    }
-                }
-
-                // 2. Buscar cabeçalhos
-                const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${sheet_name}`);
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Não foi possível carregar a planilha.');
-                }
-                
-                const headers = data.headers;
-                
-                if (!headers || headers.length === 0) throw new Error('Planilha vazia ou sem cabeçalhos na primeira linha.');
-
-                // Preencher os Selects de Mapeamento
-                const fields = ['cliente', 'data', 'valor', 'pedido', 'erp', 'vendedor', 'nota', 'etiqueta', 'status_ped', 'entrega'];
-                const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
-                const mapping = config.mapping || {};
-
-                fields.forEach(f => {
-                    const select = document.getElementById(`gs_map_${f}`);
-                    if (!select) return;
-                    select.innerHTML = '<option value="">-- Selecione uma coluna --</option>';
-                    headers.forEach(h => {
-                        const option = document.createElement('option');
-                        option.value = h;
-                        option.textContent = h;
-                        
-                        // Lógica de mapeamento
-                        const labelMap = {
-                            'cliente': 'Cliente', 'data': 'Data', 'valor': 'Valor', 'pedido': 'Pedido Haco', 'erp': 'Código ERP',
-                            'vendedor': 'Vendedor', 'nota': 'Nota Fiscal', 'etiqueta': 'Código Etiqueta', 'status_ped': 'Status Pedido', 'entrega': 'Data Entrega'
-                        };
-                        const mappingKey = labelMap[f];
-                        
-                        if (mapping[mappingKey] === h) {
-                            option.selected = true;
-                        } else if (!mapping[mappingKey] && h) {
-                            // Tenta auto-mapear se o nome for parecido
-                            const lowerH = h.toString().toLowerCase();
-                            if (f === 'cliente' && (lowerH.includes('cliente') || lowerH.includes('nome'))) option.selected = true;
-                            if (f === 'data' && (lowerH.includes('data') || lowerH.includes('ajustada'))) option.selected = true;
-                            if (f === 'valor' && (lowerH.includes('valor') || lowerH.includes('total'))) option.selected = true;
-                            if (f === 'pedido' && (lowerH.includes('pedido') || lowerH.includes('item'))) option.selected = true;
-                            if (f === 'erp' && (lowerH.includes('erp') || lowerH.includes('código') || lowerH.includes('cd '))) option.selected = true;
-                            if (f === 'vendedor' && (lowerH.includes('vendedor') || lowerH.includes('vend'))) option.selected = true;
-                            if (f === 'nota' && (lowerH.includes('nota') || lowerH.includes('nf'))) option.selected = true;
-                            if (f === 'etiqueta' && (lowerH.includes('etiqueta') || lowerH.includes('tag'))) option.selected = true;
-                            if (f === 'status_ped' && (lowerH.includes('status'))) option.selected = true;
-                            if (f === 'entrega' && (lowerH.includes('entrega') || lowerH.includes('entre'))) option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                });
-
-                document.getElementById('gs_mapping_container').style.display = 'block';
-                if (!isInitial) alert('✅ Colunas detectadas com sucesso!');
-
-            } catch (err) {
-                alert('❌ Erro: ' + err.message);
-            } finally {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            }
-        }
 
         function salvarConfigGoogleSheets() {
             try {
                 const spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
-                const sheet_name = document.getElementById('gs_sheet_name').value.trim();
+                const checkboxes = document.querySelectorAll('.chk-gs-sheet:checked');
+                const sheet_names = Array.from(checkboxes).map(cb => cb.value);
                 
                 // Atualiza o campo com o ID limpo
                 document.getElementById('gs_spreadsheet_id').value = spreadsheet_id;
@@ -7805,12 +7660,12 @@
                 const vendedor_filter = document.getElementById('gs_filter_vendedor').value.trim();
                 const auto_sync = document.getElementById('gs_auto_sync').checked;
 
-                if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
-                    alert('⚠️ Preencha o ID da planilha e mapeie pelo menos Cliente, Data e Valor.');
+                if (!spreadsheet_id || sheet_names.length === 0 || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
+                    alert('⚠️ Preencha o ID, selecione pelo menos uma aba e mapeie Cliente, Data e Valor.');
                     return;
                 }
 
-                const config = { spreadsheet_id, sheet_name, mapping, vendedor_filter, auto_sync };
+                const config = { spreadsheet_id, sheet_names, mapping, vendedor_filter, auto_sync };
                 localStorage.setItem('haco_gsheets_config', JSON.stringify(config));
                 
                 if (auto_sync) iniciarAutoSyncLoop();
@@ -7819,7 +7674,7 @@
                 alert('✅ Configuração do Google Sheets salva com sucesso!');
                 fecharConfigGoogleSheets();
             } catch (e) {
-                alert("ERRO CRÍTICO AO SALVAR AS CONFIGURAÇÕES!\nPor favor, me mande print desta mensagem:\n\n" + e.message + "\n\n" + e.stack);
+                alert("ERRO CRÍTICO AO SALVAR AS CONFIGURAÇÕES!\n" + e.message);
                 console.error("Erro no salvarConfigGoogleSheets:", e);
             }
         }
@@ -7955,7 +7810,7 @@
                 const snapshotClientes = JSON.stringify(app.clientes);
 
                 while (hasMore) {
-                    if (!isAutoSync && btn) btn.innerHTML = `⏳ Importando linhas ${skip} a ${skip + limit - 1}...`;
+                    if (!isAutoSync && btn) btn.innerHTML = `⏳ Importando registros...`;
                     
                     const payload = { ...config, skip, limit };
 
@@ -8263,11 +8118,9 @@
             </div>
 
             <div class="form-group">
-                <label>🔔 Nome da Aba (Sheet Name)</label>
-                <div style="display: flex; gap: 10px;">
-                    <select id="gs_sheet_name" style="flex: 1;">
-                        <option value="Página1">Página1</option>
-                    </select>
+                <label>📑 Selecione as Abas da Planilha (Multi-seleção)</label>
+                <div id="gs_sheets_container" style="max-height: 150px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; background: var(--bg-section); display: flex; flex-direction: column; gap: 8px;">
+                    <p style="font-size: 12px; color: var(--text-secondary); text-align: center;">Clique em "Detectar Colunas" para listar as abas.</p>
                 </div>
             </div>
 
