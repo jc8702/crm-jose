@@ -209,7 +209,8 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
 
         return {
             "message": f"Sincronizados {len(results)} registros com sucesso!",
-            "data": results
+            "data": results,
+            "fetched_count": len(rows)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na sincronização: {str(e)}")
