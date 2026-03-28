@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
 
+from sqlalchemy import text
 from . import models, schemas
 from .database import engine, get_db
 from .google_sheets import fetch_sheet_data, get_sheet_headers
@@ -36,7 +37,7 @@ def healthz():
 def debug_db(db: Session = Depends(get_db)):
     try:
         # Tenta executar uma consulta simples para validar a conexão e versão
-        result = db.execute(models.sqlalchemy.text("SELECT version();")).fetchone()
+        result = db.execute(text("SELECT version();")).fetchone()
         return {"database": str(result[0])}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na conexão com o banco: {str(e)}")
