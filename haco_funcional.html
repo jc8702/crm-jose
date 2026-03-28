@@ -7608,6 +7608,8 @@
             const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
             document.getElementById('gs_spreadsheet_id').value = config.spreadsheet_id || '';
             document.getElementById('gs_filter_vendedor').value = config.vendedor_filter || '';
+            document.getElementById('gs_auto_sync').checked = !!config.auto_sync;
+            atualizarToggleVisual(!!config.auto_sync);
             
             const sheetSelect = document.getElementById('gs_sheet_name');
             sheetSelect.innerHTML = `<option value="${config.sheet_name || 'Página1'}">${config.sheet_name || 'Página1'}</option>`;
@@ -7744,30 +7746,139 @@
             };
 
             const vendedor_filter = document.getElementById('gs_filter_vendedor').value.trim();
+            const auto_sync = document.getElementById('gs_auto_sync').checked;
 
             if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
                 alert('⚠️ Preencha o ID da planilha e mapeie pelo menos Cliente, Data e Valor.');
                 return;
             }
 
-            const config = { spreadsheet_id, sheet_name, mapping, vendedor_filter };
+            const config = { spreadsheet_id, sheet_name, mapping, vendedor_filter, auto_sync };
             localStorage.setItem('haco_gsheets_config', JSON.stringify(config));
+            
+            if (auto_sync) iniciarAutoSyncLoop();
+            else pararAutoSyncLoop();
             
             alert('✅ Configuração do Google Sheets salva com sucesso!');
             fecharConfigGoogleSheets();
         }
 
-        async function sincronizarGoogleSheets() {
+        function atualizarToggleVisual(checked) {
+            const slider = document.getElementById('gs_auto_sync_slider');
+            const statusTexto = document.getElementById('statusAutoSyncTempo');
+            if (slider) {
+                slider.style.backgroundColor = checked ? '#10b981' : '#ccc';
+            }
+            if (statusTexto) {
+                statusTexto.style.display = checked ? 'block' : 'none';
+            }
+        }
+
+        function toggleAutoSync(checked) {
+            atualizarToggleVisual(checked);
+        }
+
+        let autoSyncInterval = null;
+
+        function iniciarAutoSyncLoop() {
+            pararAutoSyncLoop();
+            const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
+            if (!config.spreadsheet_id || !config.auto_sync) return;
+            
+            const INTERVALO_MS = 5 * 60 * 1000; // 5 minutos
+            autoSyncInterval = setInterval(() => {
+                sincronizarGoogleSheets(true);
+            }, INTERVALO_MS);
+            console.log('✅ Auto-sync (Polling) ativado para cada 5 minutos.');
+        }
+
+        function pararAutoSyncLoop() {
+            if (autoSyncInterval) {
+                clearInterval(autoSyncInterval);
+                autoSyncInterval = null;
+                console.log('⏹️ Auto-sync (Polling) desativado.');
+            }
+        }
+
+        function mostrarNotificacaoAutoSync(mensagem) {
+            const notif = document.createElement('div');
+            notif.innerHTML = `🔄 ${mensagem}`;
+            notif.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                z-index: 9999;
+                font-weight: 600;
+                font-size: 14px;
+                transition: transform 0.3s ease, opacity 0.3s ease;
+                transform: translateX(400px);
+                opacity: 0;
+            `;
+            document.body.appendChild(notif);
+            
+            // Anim In
+            setTimeout(() => {
+                notif.style.transform = 'translateX(0)';
+                notif.style.opacity = '1';
+            }, 10);
+            
+            // Anim Out
+            setTimeout(() => {
+                notif.style.transform = 'translateX(400px)';
+                notif.style.opacity = '0';
+                setTimeout(() => notif.remove(), 350);
+            }, 5000);
+        }
+
+        // Inicia o auto-sync ao dar load na página se estiver salvo como ativo:
+        window.addEventListener('DOMContentLoaded', () => {
+            const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
+            if (config.auto_sync) {
+                iniciarAutoSyncLoop();
+            }
+        });
+
+        function extrairAno(dataString) {
+            if (!dataString) return 0;
+            const s = String(dataString).trim();
+            // YYYY-MM-DD
+            if (s.includes('-')) {
+                const partes = s.split('-');
+                if (partes[0].length === 4) return parseInt(partes[0], 10);
+            }
+            // DD/MM/YYYY ou DD/MM/YY
+            if (s.includes('/')) {
+                const partes = s.split('/');
+                if (partes.length === 3) {
+                    let anoStr = partes[2].trim().split(' ')[0]; // caso tenha hora
+                    if (anoStr.length === 2) anoStr = '20' + anoStr;
+                    return parseInt(anoStr, 10);
+                }
+            }
+            return 0;
+        }
+
+        async function sincronizarGoogleSheets(isAutoSync = false) {
             const config = JSON.parse(localStorage.getItem('haco_gsheets_config') || '{}');
             if (!config.spreadsheet_id || !config.mapping) {
-                alert('⚠️ Google Sheets não configurado. Clique em "Configurar Planilha" primeiro.');
-                abrirConfigGoogleSheets();
+                if (!isAutoSync) {
+                    alert('⚠️ Google Sheets não configurado. Clique em "Configurar Planilha" primeiro.');
+                    abrirConfigGoogleSheets();
+                }
                 return;
             }
 
             const btn = document.querySelector('button[onclick="sincronizarGoogleSheets()"]');
             const originalText = btn ? btn.innerHTML : 'Sincronizar Lotes';
-            if (btn) btn.disabled = true;
+            
+            if (!isAutoSync && btn) btn.disabled = true;
+
+            const ANO_FILTRO = 2026;
 
             try {
                 let skip = 2; // Começa na linha 2 (ignorando header naturo)
@@ -7783,7 +7894,7 @@
                 const snapshotClientes = JSON.stringify(app.clientes);
 
                 while (hasMore) {
-                    if (btn) btn.innerHTML = `⏳ Importando linhas ${skip} a ${skip + limit - 1}...`;
+                    if (!isAutoSync && btn) btn.innerHTML = `⏳ Importando linhas ${skip} a ${skip + limit - 1}...`;
                     
                     const payload = { ...config, skip, limit };
 
@@ -7803,6 +7914,13 @@
                     }
                     
                     result.data.forEach(item => {
+                        // Filtro Trito de Ano (2026)
+                        const rawData = item.data || item.Data || '';
+                        const anoData = extrairAno(rawData);
+                        if (anoData && anoData !== ANO_FILTRO) {
+                            return; // skip igual 'continue' no foreach
+                        }
+
                         // python retorna 'pedido' para 'Pedido Haco'
                         const pedidoHacoItem = item.pedido || '-';
                         const jaExiste = pedidoHacoItem !== '-' && app.faturamentos.some(f => f.pedidoHaco === pedidoHacoItem);
@@ -7855,28 +7973,36 @@
                 }
 
                 if (totalNovos > 0 || clientesCriados > 0) {
-                    if (btn) btn.innerHTML = `⏳ Salvando na Nuvem...`;
+                    if (!isAutoSync && btn) btn.innerHTML = `⏳ Salvando na Nuvem...`;
                     try {
                         await salvar(); // Apenas 1 request para o Neon (Opção A)
                         atualizarDashboard();
                         preencherClientesFaturamento();
                         preencherClientesAgendamento();
                         atualizarTabelaClientes();
-                        alert(`✅ Sincronização concluída!\n\n${totalNovos} faturamentos importados.\n${clientesCriados} clientes pré-cadastrados.\n${totalIgnorados} ignorados.`);
+                        
+                        if (isAutoSync) {
+                            mostrarNotificacaoAutoSync(`${totalNovos} novos faturamentos importados`);
+                        } else {
+                            alert(`✅ Sincronização concluída!\n\n${totalNovos} faturamentos importados.\n${clientesCriados} clientes pré-cadastrados.\n${totalIgnorados} ignorados.`);
+                        }
                     } catch (errSave) {
                         // Rollback em memória
                         app.faturamentos = JSON.parse(snapshotFaturamentos);
                         app.clientes = JSON.parse(snapshotClientes);
-                        throw new Error('Erro ao persistir. ' + errSave.message);
+                        
+                        if (isAutoSync) console.error('Erro ao persistir no Auto-sync:', errSave.message);
+                        else throw new Error('Erro ao persistir. ' + errSave.message);
                     }
                 } else {
-                    alert('ℹ️ Nenhuns dados novos encontrados na planilha.');
+                    if (!isAutoSync) alert('ℹ️ Nenhuns dados novos encontrados na planilha.');
                 }
 
             } catch (err) {
-                alert('❌ Erro na sincronização: ' + err.message);
+                if (isAutoSync) console.error('Erro no Auto-Sync:', err.message);
+                else alert('❌ Erro na sincronização: ' + err.message);
             } finally {
-                if (btn) {
+                if (!isAutoSync && btn) {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
                 }
@@ -8130,6 +8256,18 @@
                     <label style="font-weight: 700; display: block; margin-bottom: 6px; color: #0e6e6e;">🎯 Filtrar por Vendedor Padrão (Opcional)</label>
                     <input type="text" id="gs_filter_vendedor" placeholder="Nome do vendedor como na planilha (ex: JOSÉ CARLOS)" style="width: 100%; border: 1.5px solid var(--border); padding: 10px; border-radius: 6px;">
                     <small style="color: var(--text-secondary); display: block; margin-top: 5px;">Se preenchido, apenas os dados deste vendedor serão importados.</small>
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <label style="font-weight: 700; color: #166534; display: block; margin-bottom: 4px;">🔄 Sincronização Automática</label>
+                        <small style="color: #15803d; display: block;">Importar faturamentos novos a cada 5 minutos em background.</small>
+                        <small id="statusAutoSyncTempo" style="display: none; color: #166534; font-weight: 600; margin-top: 4px;">Próximo sync em breve...</small>
+                    </div>
+                    <label class="toggle-switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                        <input type="checkbox" id="gs_auto_sync" style="opacity: 0; width: 0; height: 0;" onchange="toggleAutoSync(this.checked)">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px;" id="gs_auto_sync_slider"></span>
+                    </label>
                 </div>
             </div>
 
