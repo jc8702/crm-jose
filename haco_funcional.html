@@ -6512,20 +6512,41 @@
             alert('✓ Backup realizado com sucesso!');
         }
 
-        function limparDados() {
+        async function limparDados() {
             if (confirm('⚠️ AVISO: Isso deletará TODOS os dados do sistema!\n\nTem certeza?')) {
                 if (confirm('Confirmar novamente? Esta ação é irreversível!')) {
-                    localStorage.clear();
-                    app = {
-                        clientes: {},
-                        faturamentos: [],
-                        oportunidades: [],
-                        projetos: [],
-                        visitas: [],
-                        currentMonth: new Date().getMonth() + 1,
-                        currentYear: new Date().getFullYear()
-                    };
-                    location.reload();
+                    try {
+                        // 1. Limpa o banco de dados na nuvem (FastAPI/SQL)
+                        const response = await fetch('/api/sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Erro ao limpar o banco na nuvem.');
+                        }
+
+                        // 2. Limpa o navegador, mas preserva a flag de que já foi inicializado
+                        localStorage.clear();
+                        localStorage.setItem('crm_inicializado', 'true');
+                        
+                        app = {
+                            clientes: {},
+                            faturamentos: [],
+                            oportunidades: [],
+                            projetos: [],
+                            visitas: [],
+                            currentMonth: new Date().getMonth() + 1,
+                            currentYear: new Date().getFullYear()
+                        };
+
+                        alert('✓ Sistema reiniciado com sucesso!');
+                        location.reload();
+                    } catch (error) {
+                        console.error('Falha ao limpar:', error);
+                        alert('❌ Erro ao limpar dados na nuvem. Verifique sua conexão.');
+                    }
                 }
             }
         }
