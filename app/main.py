@@ -11,7 +11,7 @@ from . import models, schemas
 from .database import engine, get_db
 from .google_sheets import fetch_sheet_data, get_sheet_headers
 
-#models.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine)
 
 BASE_DIR = Path(__file__).resolve().parent
 

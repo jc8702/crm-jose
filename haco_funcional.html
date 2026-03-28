@@ -6515,7 +6515,13 @@
         async function limparDados() {
             if (confirm('⚠️ AVISO: Isso deletará TODOS os dados do sistema!\n\nTem certeza?')) {
                 if (confirm('Confirmar novamente? Esta ação é irreversível!')) {
+                    const btn = event.target.closest('button');
+                    const originalTxt = btn.innerHTML;
+                    
                     try {
+                        btn.disabled = true;
+                        btn.innerHTML = '⌛ Limpando Nuvem...';
+
                         // 1. Limpa o banco de dados na nuvem (FastAPI/SQL)
                         const response = await fetch('/api/sync', {
                             method: 'POST',
@@ -6531,20 +6537,12 @@
                         localStorage.clear();
                         localStorage.setItem('crm_inicializado', 'true');
                         
-                        app = {
-                            clientes: {},
-                            faturamentos: [],
-                            oportunidades: [],
-                            projetos: [],
-                            visitas: [],
-                            currentMonth: new Date().getMonth() + 1,
-                            currentYear: new Date().getFullYear()
-                        };
-
                         alert('✓ Sistema reiniciado com sucesso!');
                         location.reload();
                     } catch (error) {
                         console.error('Falha ao limpar:', error);
+                        btn.disabled = false;
+                        btn.innerHTML = originalTxt;
                         alert('❌ Erro ao limpar dados na nuvem. Verifique sua conexão.');
                     }
                 }
