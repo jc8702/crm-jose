@@ -798,9 +798,11 @@
                         <button class="btn-primary" onclick="limparFiltroFaturamento()" style="padding: 10px 16px;">↺ Limpar Filtro</button>
                     </div>
                 </div>
-                
+                <style>
+                    #tabelaFaturamentosDetalhados td { padding: 8px 6px !important; font-size: 12px !important; }
+                </style>
                 <div style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border); padding-bottom: 8px;">
-                    <table class="tabela" style="min-width: 1050px;">
+                    <table class="tabela" style="min-width: 900px;">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -3303,13 +3305,13 @@
                         <td style="font-size:12px">${f.statusPedido || '-'}</td>
                         <td>${formatarDataVisao(f.dataEntrega)}</td>
                         <td style="white-space: nowrap; text-align: center;">
-                            <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="display: inline-block; vertical-align: middle; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 14px; min-width: 130px; margin-right: 4px;">
-                                <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pendente</option>
-                                <option value="sim" ${statusFaturado === 'sim' ? 'selected' : ''}>✅ Faturado</option>
-                                <option value="nao" ${statusFaturado === 'nao' ? 'selected' : ''}>❌ Não Faturado</option>
+                            <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="display: inline-block; vertical-align: middle; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 11.5px; width: 105px; margin-right: 4px;">
+                                <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pende.</option>
+                                <option value="sim" ${statusFaturado === 'sim' ? 'selected' : ''}>✅ Faturad.</option>
+                                <option value="nao" ${statusFaturado === 'nao' ? 'selected' : ''}>❌ Ñ Fatur.</option>
                             </select>
-                            <button class="btn-success" style="display: inline-block; vertical-align: middle; margin-right: 4px;" onclick="abrirModalEditarFaturamento(${indiceReal})">Editar</button>
-                            <button class="btn-danger" style="display: inline-block; vertical-align: middle;" onclick="deletarFaturamento(${indiceReal})">Deletar</button>
+                            <button class="btn-success" style="display: inline-block; vertical-align: middle; margin-right: 4px; padding: 4px 8px;" onclick="abrirModalEditarFaturamento(${indiceReal})" title="Editar">✏️</button>
+                            <button class="btn-danger" style="display: inline-block; vertical-align: middle; padding: 4px 8px;" onclick="deletarFaturamento(${indiceReal})" title="Deletar">🗑️</button>
                         </td>
                     </tr>
                 `}).join('');
