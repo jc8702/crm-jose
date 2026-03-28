@@ -2672,16 +2672,16 @@
             salvar(); // Salva os padrões iniciais no banco local
         }
 
-        function salvar() {
+        async function salvar() {
             localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
             localStorage.setItem('projetos', JSON.stringify(app.projetos));
             localStorage.setItem('visitas', JSON.stringify(app.visitas));
             localStorage.setItem('clientes', JSON.stringify(app.clientes));
             localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
             localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes || []));
-            
-            // Sincroniza com SQLite local IMEDIATAMENTE (sem debounce)
-            fazerBackupLocal(false);
+
+            // Aguarda sincronização com o banco (await garante persistência antes de retornar)
+            await fazerBackupLocal(false);
         }
 
         // ===== STATUS DO BANCO SQL =====
@@ -3795,7 +3795,7 @@
             document.getElementById('codErpInput').value = erp;
         }
 
-        function salvarFaturamento() {
+        async function salvarFaturamento() {
             const cliente = document.getElementById('clienteSelect').value;
             const data = document.getElementById('dataFaturamento').value;
             const pedidoHaco = document.getElementById('pedidoHaco').value;
@@ -3815,31 +3815,36 @@
                 return;
             }
 
-            app.faturamentos.push({
-                cliente, 
-                erp, 
-                valor, 
-                data, 
+            const novoFat = {
+                cliente, erp, valor, data,
                 pedidoHaco: pedidoHaco || '-',
-                vendedor: '-',
-                notaFiscal: '-',
-                codigoEtiqueta: '-',
-                statusPedido: 'pendente',
-                dataEntrega: '-'
-            });
-            salvar();
+                vendedor: '-', notaFiscal: '-',
+                codigoEtiqueta: '-', statusPedido: 'pendente', dataEntrega: '-'
+            };
+
+            app.faturamentos.push(novoFat);
             atualizarDashboard();
 
-            document.getElementById('resultadoFaturamento').innerHTML = `<div style="padding: 16px; border-radius: 6px; background: #f5faf0; border-left: 4px solid var(--success);">✓ ${cliente} (${erp}) - R$ ${valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} registrado!${pedidoHaco ? ` | Pedido: ${pedidoHaco}` : ''}</div>`;
-            document.getElementById('resultadoFaturamento').style.display = 'block';
+            try {
+                await salvar();
 
-            document.getElementById('clienteSelect').value = '';
-            document.getElementById('codErpInput').value = '';
-            document.getElementById('dataFaturamento').value = '';
-            document.getElementById('pedidoHaco').value = '';
-            document.getElementById('valorFaturamento').value = '';
+                document.getElementById('resultadoFaturamento').innerHTML = `<div style="padding: 16px; border-radius: 6px; background: #f5faf0; border-left: 4px solid var(--success);">✓ ${cliente} (${erp}) - R$ ${valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} registrado!${pedidoHaco ? ` | Pedido: ${pedidoHaco}` : ''}</div>`;
+                document.getElementById('resultadoFaturamento').style.display = 'block';
 
-            setTimeout(() => { document.getElementById('resultadoFaturamento').style.display = 'none'; }, 3000);
+                document.getElementById('clienteSelect').value = '';
+                document.getElementById('codErpInput').value = '';
+                document.getElementById('dataFaturamento').value = '';
+                document.getElementById('pedidoHaco').value = '';
+                document.getElementById('valorFaturamento').value = '';
+
+                setTimeout(() => { document.getElementById('resultadoFaturamento').style.display = 'none'; }, 3000);
+            } catch (err) {
+                // Rollback: remove o item inserido
+                app.faturamentos.pop();
+                localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+                atualizarDashboard();
+                alert('❌ Erro ao salvar no banco de dados. Verifique sua conexão e tente novamente.');
+            }
         }
 
         // CLIENTES
@@ -3851,7 +3856,7 @@
             document.getElementById('modalCadastroCliente').classList.remove('active');
         }
 
-        function salvarClienteNovo() {
+        async function salvarClienteNovo() {
             const nome = document.getElementById('nomeCliente').value;
             const erp = document.getElementById('erpCliente').value;
             const cidade = document.getElementById('cidadeCliente').value;
@@ -3864,17 +3869,27 @@
             }
 
             app.clientes[nome] = {erp, cidade, estado, recorrencia};
-            salvar();
             preencherClientesFaturamento();
             preencherClientesAgendamento();
             atualizarTabelaClientes();
-            closeModalCadastroCliente();
 
-            document.getElementById('nomeCliente').value = '';
-            document.getElementById('erpCliente').value = '';
-            document.getElementById('cidadeCliente').value = '';
-            document.getElementById('estadoCliente').value = '';
-            document.getElementById('recorrenciaCliente').value = '';
+            try {
+                await salvar();
+                closeModalCadastroCliente();
+                document.getElementById('nomeCliente').value = '';
+                document.getElementById('erpCliente').value = '';
+                document.getElementById('cidadeCliente').value = '';
+                document.getElementById('estadoCliente').value = '';
+                document.getElementById('recorrenciaCliente').value = '';
+            } catch (err) {
+                // Rollback
+                delete app.clientes[nome];
+                localStorage.setItem('clientes', JSON.stringify(app.clientes));
+                preencherClientesFaturamento();
+                preencherClientesAgendamento();
+                atualizarTabelaClientes();
+                alert('❌ Erro ao salvar cliente no banco. Operação revertida.');
+            }
         }
 
         let nomeClienteEmEdicao = null;
@@ -3895,7 +3910,7 @@
             nomeClienteEmEdicao = null;
         }
 
-        function salvarClienteEditado() {
+        async function salvarClienteEditado() {
             const nomeNovo = document.getElementById('nomeClienteEditar').value;
             const erp = document.getElementById('erpClienteEditar').value;
             const cidade = document.getElementById('cidadeClienteEditar').value;
@@ -3907,6 +3922,10 @@
                 return;
             }
 
+            // Snapshot para rollback
+            const snapshotClientes = JSON.parse(JSON.stringify(app.clientes));
+            const snapshotFaturamentos = JSON.parse(JSON.stringify(app.faturamentos));
+
             if (nomeNovo !== nomeClienteEmEdicao) {
                 delete app.clientes[nomeClienteEmEdicao];
                 app.faturamentos.forEach(f => {
@@ -3915,13 +3934,27 @@
             }
 
             app.clientes[nomeNovo] = {erp, cidade, estado, recorrencia};
-            salvar();
             preencherClientesFaturamento();
             preencherClientesAgendamento();
             atualizarTabelaClientes();
             atualizarDashboard();
-            closeModalEditarCliente();
-            alert('Cliente atualizado com sucesso!');
+
+            try {
+                await salvar();
+                closeModalEditarCliente();
+                alert('Cliente atualizado com sucesso!');
+            } catch (err) {
+                // Rollback
+                app.clientes = snapshotClientes;
+                app.faturamentos = snapshotFaturamentos;
+                localStorage.setItem('clientes', JSON.stringify(app.clientes));
+                localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+                preencherClientesFaturamento();
+                preencherClientesAgendamento();
+                atualizarTabelaClientes();
+                atualizarDashboard();
+                alert('❌ Erro ao atualizar cliente no banco. Alterações revertidas.');
+            }
         }
 
         function atualizarTabelaClientes() {
@@ -3962,13 +3995,26 @@
             }
         }
 
-        function deletarCliente(nome) {
-            if (confirm(`Deletar cliente ${nome}?`)) {
-                delete app.clientes[nome];
-                salvar();
+        async function deletarCliente(nome) {
+            if (!confirm(`Deletar cliente ${nome}?`)) return;
+
+            const snapshotCliente = app.clientes[nome];
+            delete app.clientes[nome];
+            localStorage.setItem('clientes', JSON.stringify(app.clientes));
+            preencherClientesFaturamento();
+            preencherClientesAgendamento();
+            atualizarTabelaClientes();
+
+            try {
+                await salvar();
+            } catch (err) {
+                // Rollback
+                app.clientes[nome] = snapshotCliente;
+                localStorage.setItem('clientes', JSON.stringify(app.clientes));
                 preencherClientesFaturamento();
                 preencherClientesAgendamento();
                 atualizarTabelaClientes();
+                alert('❌ Erro ao deletar cliente no banco. Operação revertida.');
             }
         }
 
@@ -4000,7 +4046,7 @@
             faturamentoEmEdicao = null;
         }
 
-        function salvarFaturamentoEditado() {
+        async function salvarFaturamentoEditado() {
             if (faturamentoEmEdicao === null) return;
 
             const data = document.getElementById('dataFaturamentoEditar').value;
@@ -4017,34 +4063,92 @@
                 return;
             }
 
-            app.faturamentos[faturamentoEmEdicao].data = data;
-            app.faturamentos[faturamentoEmEdicao].pedidoHaco = pedidoHaco || '-';
-            app.faturamentos[faturamentoEmEdicao].valor = valor;
-            app.faturamentos[faturamentoEmEdicao].vendedor = vendedor;
-            app.faturamentos[faturamentoEmEdicao].notaFiscal = notaFiscal;
-            app.faturamentos[faturamentoEmEdicao].codigoEtiqueta = codigoEtiqueta;
-            app.faturamentos[faturamentoEmEdicao].statusPedido = statusPedido;
-            app.faturamentos[faturamentoEmEdicao].dataEntrega = dataEntrega;
-            
-            salvar();
-            atualizarDashboard();
-            closeModalEditarFaturamento();
-            
-            alert('✓ Faturamento atualizado com sucesso!');
-        }
+            // Snapshot para rollback
+            const idx = faturamentoEmEdicao;
+            const snapshot = { ...app.faturamentos[idx] };
 
-        function mudarStatusFaturamento(indice, novoStatus) {
-            app.faturamentos[indice].statusFaturado = novoStatus;
-            salvar();
-            atualizarDashboard();
-        }
+            app.faturamentos[idx].data = data;
+            app.faturamentos[idx].pedidoHaco = pedidoHaco || '-';
+            app.faturamentos[idx].valor = valor;
+            app.faturamentos[idx].vendedor = vendedor;
+            app.faturamentos[idx].notaFiscal = notaFiscal;
+            app.faturamentos[idx].codigoEtiqueta = codigoEtiqueta;
+            app.faturamentos[idx].statusPedido = statusPedido;
+            app.faturamentos[idx].dataEntrega = dataEntrega;
 
-        function deletarFaturamento(indice) {
-            const fat = app.faturamentos[indice];
-            if (confirm(`Deletar faturamento de ${fat.cliente} no valor de R$ ${fat.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}?`)) {
-                app.faturamentos.splice(indice, 1);
-                salvar();
+            try {
+                await salvar();
                 atualizarDashboard();
+                closeModalEditarFaturamento();
+                alert('✓ Faturamento atualizado com sucesso!');
+            } catch (err) {
+                // Rollback
+                app.faturamentos[idx] = snapshot;
+                localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+                atualizarDashboard();
+                alert('❌ Erro ao atualizar no banco de dados. As alterações foram revertidas.');
+            }
+        }
+
+        async function mudarStatusFaturamento(indice, novoStatus) {
+            const statusAnterior = app.faturamentos[indice].statusFaturado;
+            app.faturamentos[indice].statusFaturado = novoStatus;
+            try {
+                await salvar();
+                atualizarDashboard();
+            } catch (err) {
+                // Rollback
+                app.faturamentos[indice].statusFaturado = statusAnterior;
+                localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+                alert('❌ Erro ao salvar status no banco. Alteração revertida.');
+            }
+        }
+
+        async function deletarFaturamento(indice) {
+            const fat = app.faturamentos[indice];
+            if (!confirm(`Deletar faturamento de ${fat.cliente} no valor de R$ ${fat.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}?`)) return;
+
+            // 1. Remove do array local temporariamente
+            const [removido] = app.faturamentos.splice(indice, 1);
+
+            // 2. Persiste no localStorage imediatamente
+            localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+            localStorage.setItem('projetos', JSON.stringify(app.projetos));
+            localStorage.setItem('visitas', JSON.stringify(app.visitas));
+            localStorage.setItem('clientes', JSON.stringify(app.clientes));
+            localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
+            localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes || []));
+
+            // 3. Atualiza UI otimisticamente
+            atualizarDashboard();
+
+            // 4. Sincroniza com o backend e aguarda confirmação
+            try {
+                const payload = {
+                    faturamentos: app.faturamentos,
+                    clientes: app.clientes,
+                    projetos: app.projetos,
+                    visitas: app.visitas,
+                    oportunidades: app.oportunidades,
+                    visitasReunioes: app.visitasReunioes || []
+                };
+                const response = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                _dbSetStatus('conectado', '✅ Salvo no Banco');
+            } catch (err) {
+                // 5. Se falhou na API: reverte o delete
+                console.error('Erro ao deletar faturamento no backend:', err);
+                app.faturamentos.splice(indice, 0, removido); // Reinsere no lugar original
+                localStorage.setItem('faturamentos', JSON.stringify(app.faturamentos));
+                atualizarDashboard();
+                _dbSetStatus('erro', '❌ Falha API');
+                alert('❌ Erro ao deletar no banco de dados. O registro foi restaurado.\nVerifique sua conexão e tente novamente.');
             }
         }
 
@@ -4117,7 +4221,7 @@
             }
         }
 
-        function confirmarAgendamento() {
+        async function confirmarAgendamento() {
             const tipo = document.getElementById('tipocliente').value;
             const cliente = tipo === 'carteira' ? document.getElementById('clienteAgendamento').value : document.getElementById('novoClienteInput').value;
             const data = document.getElementById('dataAgendamento').value;
@@ -4137,12 +4241,15 @@
                 return;
             }
 
+            let novoItem = null;
+            let colecao = null;
+
             if (tipo === 'carteira') {
                 const tipoVisita = document.getElementById('tipoVisita').value;
                 const statusVisita = document.getElementById('statusVisita').value;
                 const erp = app.clientes[cliente]?.erp || '';
                 
-                const novaVisita = {
+                novoItem = {
                     cliente, tipo: 'visita_carteira', tipoVisita, data, hora: hora || '', 
                     cidade, estado, status: statusVisita, obs: obs || '',
                     nomeContato, cargoContato, telefoneContato, emailContato,
@@ -4155,24 +4262,22 @@
                         editavel: false
                     }]
                 };
-                // Adicionar observação à timeline se houver
                 if (obs && obs.trim()) {
-                    novaVisita.timeline.push({
+                    novoItem.timeline.push({
                         data: new Date().toLocaleDateString('pt-BR'),
                         hora: new Date().toLocaleTimeString('pt-BR'),
-                        evento: '📝 Observação Inicial',
-                        descricao: obs,
-                        editavel: true
+                        evento: '\uD83D\uDCDD Observação Inicial',
+                        descricao: obs, editavel: true
                     });
                 }
-                app.visitas.push(novaVisita);
+                app.visitas.push(novoItem);
+                colecao = 'visitas';
             } else {
                 const status = document.getElementById('statusProjeto').value;
-                // Sempre obter statusVisita mesmo que esteja hidden
                 const statusVisita = document.getElementById('statusVisita').value || 'agendada';
-                const novoProjeto = {
+                novoItem = {
                     cliente, tipo: 'novo_projeto', data, hora: hora || '', 
-                    cidade, estado, status, statusVisita: statusVisita, obs: obs || '',
+                    cidade, estado, status, statusVisita, obs: obs || '',
                     nomeContato, cargoContato, telefoneContato, emailContato,
                     dataCriacao: new Date().toISOString(),
                     timeline: [{
@@ -4183,43 +4288,51 @@
                         editavel: false
                     }]
                 };
-                // Adicionar observação à timeline se houver
                 if (obs && obs.trim()) {
-                    novoProjeto.timeline.push({
+                    novoItem.timeline.push({
                         data: new Date().toLocaleDateString('pt-BR'),
                         hora: new Date().toLocaleTimeString('pt-BR'),
-                        evento: '📝 Observação Inicial',
-                        descricao: obs,
-                        editavel: true
+                        evento: '\uD83D\uDCDD Observação Inicial',
+                        descricao: obs, editavel: true
                     });
                 }
-                app.projetos.push(novoProjeto);
-                // Também adicionar em visitas para aparecer na timeline
-                app.visitas.push(novoProjeto);
+                app.projetos.push(novoItem);
+                app.visitas.push(novoItem);
+                colecao = 'projetos';
             }
 
-            salvar();
             renderCalendarVisitas();
             atualizarClientesCarteira();
-            closeModalAgendamento();
 
-            // Limpar campos
-            document.getElementById('tipocliente').value = '';
-            document.getElementById('clienteAgendamento').value = '';
-            document.getElementById('novoClienteInput').value = '';
-            document.getElementById('dataAgendamento').value = '';
-            document.getElementById('horaAgendamento').value = '';
-            document.getElementById('cidadeAgendamento').value = '';
-            document.getElementById('estadoAgendamento').value = '';
-            document.getElementById('statusProjeto').value = 'novo';
-            document.getElementById('statusVisita').value = 'agendada';
-            document.getElementById('obsAgendamento').value = '';
-            document.getElementById('nomeContatoAgendamento').value = '';
-            document.getElementById('cargoContatoAgendamento').value = '';
-            document.getElementById('telefoneContatoAgendamento').value = '';
-            document.getElementById('emailContatoAgendamento').value = '';
-
-            alert('✓ Visita/Projeto agendado com sucesso!');
+            try {
+                await salvar();
+                closeModalAgendamento();
+                // Limpar campos
+                document.getElementById('tipocliente').value = '';
+                document.getElementById('clienteAgendamento').value = '';
+                document.getElementById('novoClienteInput').value = '';
+                document.getElementById('dataAgendamento').value = '';
+                document.getElementById('horaAgendamento').value = '';
+                document.getElementById('cidadeAgendamento').value = '';
+                document.getElementById('estadoAgendamento').value = '';
+                document.getElementById('statusProjeto').value = 'novo';
+                document.getElementById('statusVisita').value = 'agendada';
+                document.getElementById('obsAgendamento').value = '';
+                document.getElementById('nomeContatoAgendamento').value = '';
+                document.getElementById('cargoContatoAgendamento').value = '';
+                document.getElementById('telefoneContatoAgendamento').value = '';
+                document.getElementById('emailContatoAgendamento').value = '';
+                alert('✓ Visita/Projeto agendado com sucesso!');
+            } catch (err) {
+                // Rollback
+                app.visitas.pop();
+                if (colecao === 'projetos') app.projetos.pop();
+                localStorage.setItem('visitas', JSON.stringify(app.visitas));
+                localStorage.setItem('projetos', JSON.stringify(app.projetos));
+                renderCalendarVisitas();
+                atualizarClientesCarteira();
+                alert('❌ Erro ao salvar no banco. Operação revertida.');
+            }
         }
 
         function renderCalendar() {
@@ -4788,7 +4901,7 @@
             document.getElementById('modalCadastroOportunidade').classList.remove('active');
         }
 
-        function salvarOportunidade() {
+        async function salvarOportunidade() {
             const nome = document.getElementById('nomeOportunidade').value;
             const cliente = document.getElementById('clienteOportunidade').value;
             const contato = document.getElementById('nomeContatoOportunidade').value;
@@ -4810,18 +4923,10 @@
                 etapa: 'novo',
                 dataCriacao: new Date().toISOString(),
                 integrador: {
-                    nome: '',
-                    comissao: 0,
-                    erpCliente: '',
-                    consumoMensal: 0,
-                    modelosEtiqueta: [],
-                    subsidioHaco: false,
-                    equipamentos: 0,
-                    impressoraComodato: false,
-                    modeloImpressora: '',
-                    precoImpressora: 0,
-                    mensalidadeSistema: 0,
-                    tevePOC: false
+                    nome: '', comissao: 0, erpCliente: '', consumoMensal: 0,
+                    modelosEtiqueta: [], subsidioHaco: false, equipamentos: 0,
+                    impressoraComodato: false, modeloImpressora: '', precoImpressora: 0,
+                    mensalidadeSistema: 0, tevePOC: false
                 },
                 timeline: [{
                     data: new Date().toLocaleDateString('pt-BR'),
@@ -4833,17 +4938,34 @@
             };
 
             app.oportunidades.push(oportunidade);
-            salvar();
             renderKanban();
-            closeModalCadastroOportunidade();
-            alert('Oportunidade cadastrada com sucesso!');
+
+            try {
+                await salvar();
+                closeModalCadastroOportunidade();
+                alert('Oportunidade cadastrada com sucesso!');
+            } catch (err) {
+                app.oportunidades.pop();
+                localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
+                renderKanban();
+                alert('❌ Erro ao salvar oportunidade no banco. Operação revertida.');
+            }
         }
 
-        function deletarOportunidade(idx) {
-            if (confirm('Deletar esta oportunidade?')) {
-                app.oportunidades.splice(idx, 1);
-                salvar();
+        async function deletarOportunidade(idx) {
+            if (!confirm('Deletar esta oportunidade?')) return;
+
+            const [removida] = app.oportunidades.splice(idx, 1);
+            localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
+            renderKanban();
+
+            try {
+                await salvar();
+            } catch (err) {
+                app.oportunidades.splice(idx, 0, removida);
+                localStorage.setItem('oportunidades', JSON.stringify(app.oportunidades));
                 renderKanban();
+                alert('❌ Erro ao deletar oportunidade no banco. Operação revertida.');
             }
         }
 
@@ -5180,7 +5302,7 @@
             document.getElementById('novaVisitaObservacoes').value = '';
         }
 
-        function salvarNovaVisitaReuniao() {
+        async function salvarNovaVisitaReuniao() {
             const cliente = document.getElementById('novaVisitaCliente').value.trim();
             const nomeContato = document.getElementById('novaVisitaNomeContato').value.trim();
             const cargo = document.getElementById('novaVisitaCargo').value.trim();
@@ -5204,19 +5326,10 @@
 
             const novaVisita = {
                 id: Date.now(),
-                cliente,
-                nomeContato,
-                cargo,
-                email,
-                telefone,
-                cidade,
-                estado,
-                data: dataFormatada,
-                dataISO: data,
-                hora,
-                tipo,
-                status: 'agendada',
-                observacoes,
+                cliente, nomeContato, cargo, email, telefone,
+                cidade, estado,
+                data: dataFormatada, dataISO: data,
+                hora, tipo, status: 'agendada', observacoes,
                 dataCriacao: new Date().toISOString(),
                 timeline: [{
                     data: new Date().toLocaleDateString('pt-BR'),
@@ -5232,10 +5345,18 @@
             }
 
             app.visitasReunioes.push(novaVisita);
-            salvar();
             renderizarKanbanVisitasReunioes();
-            closeModalNovaVisitaReuniao();
-            alert('✓ Visita/Reunião agendada com sucesso!');
+
+            try {
+                await salvar();
+                closeModalNovaVisitaReuniao();
+                alert('✓ Visita/Reunião agendada com sucesso!');
+            } catch (err) {
+                app.visitasReunioes.pop();
+                localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes));
+                renderizarKanbanVisitasReunioes();
+                alert('❌ Erro ao salvar visita/reunião no banco. Operação revertida.');
+            }
         }
 
         function renderizarKanbanVisitasReunioes() {
@@ -5607,7 +5728,7 @@
             }
         }
 
-        function salvarEdicaoVisita() {
+        async function salvarEdicaoVisita() {
             if (visitaEmEdicao === null) return;
 
             const visita = app.visitasReunioes[visitaEmEdicao];
@@ -5628,6 +5749,9 @@
             const [ano, mesData, diaData] = data.split('-');
             const dataFormatada = `${diaData}/${mesData}/${ano}`;
 
+            // Snapshot para rollback
+            const snapshot = { ...visita };
+
             // Atualizar visita
             visita.cliente = cliente;
             visita.nomeContato = document.getElementById('editVisitaContato').value.trim();
@@ -5643,11 +5767,17 @@
             visita.status = document.getElementById('editVisitaStatus').value;
             visita.observacoes = document.getElementById('editVisitaObservacoes').value.trim();
 
-            // Salvar
-            salvar();
-            renderizarKanbanVisitasReunioes();
-            closeModalDetalhesVisitaReuniao();
-            alert('✓ Visita/Reunião atualizada com sucesso!');
+            try {
+                await salvar();
+                renderizarKanbanVisitasReunioes();
+                closeModalDetalhesVisitaReuniao();
+                alert('✓ Visita/Reunião atualizada com sucesso!');
+            } catch (err) {
+                // Rollback
+                Object.assign(visita, snapshot);
+                localStorage.setItem('visitasReunioes', JSON.stringify(app.visitasReunioes));
+                alert('❌ Erro ao atualizar no banco. Alterações revertidas.');
+            }
         }
 
         function abrirDetalhesVisitaReuniao(visitaIdx, status) {
@@ -6089,30 +6219,35 @@
             }
         }
 
-        function salvarObservacao(visitaIdx, timelineIdx) {
+        async function salvarObservacao(visitaIdx, timelineIdx) {
             const textarea = document.getElementById(`textareaObs_${visitaIdx}_${timelineIdx}`);
             const novoTexto = textarea.value;
             
             if (novoTexto && novoTexto.trim()) {
+                const textoAnterior = app.visitas[visitaIdx].timeline[timelineIdx].descricao;
                 app.visitas[visitaIdx].timeline[timelineIdx].descricao = novoTexto;
-                salvar();
                 
-                // Fechar edição
-                const displayDiv = document.getElementById(`obsDisplay_${visitaIdx}_${timelineIdx}`);
-                const editDiv = document.getElementById(`obsEdit_${visitaIdx}_${timelineIdx}`);
-                displayDiv.style.display = 'block';
-                editDiv.style.display = 'none';
-                
-                // Atualizar texto exibido
-                displayDiv.querySelector('.timeline-desc').textContent = novoTexto;
-                
-                alert('✓ Observação atualizada!');
+                try {
+                    await salvar();
+                    
+                    // Fechar edição
+                    const displayDiv = document.getElementById(`obsDisplay_${visitaIdx}_${timelineIdx}`);
+                    const editDiv = document.getElementById(`obsEdit_${visitaIdx}_${timelineIdx}`);
+                    displayDiv.style.display = 'block';
+                    editDiv.style.display = 'none';
+                    displayDiv.querySelector('.timeline-desc').textContent = novoTexto;
+                    alert('✓ Observação atualizada!');
+                } catch (err) {
+                    app.visitas[visitaIdx].timeline[timelineIdx].descricao = textoAnterior;
+                    localStorage.setItem('visitas', JSON.stringify(app.visitas));
+                    alert('❌ Erro ao salvar observação. Tente novamente.');
+                }
             } else {
                 alert('A observação não pode estar vazia');
             }
         }
 
-        function adicionarObservacao(visitaIdx) {
+        async function adicionarObservacao(visitaIdx) {
             const textarea = document.getElementById(`novaObs_${visitaIdx}`);
             const texto = textarea.value;
             
@@ -6121,18 +6256,26 @@
                 return;
             }
 
-            app.visitas[visitaIdx].timeline.push({
+            const novaObs = {
                 data: new Date().toLocaleDateString('pt-BR'),
                 hora: new Date().toLocaleTimeString('pt-BR'),
-                evento: '📝 Observação',
+                evento: '\uD83D\uDCDD Observação',
                 descricao: texto,
                 editavel: true
-            });
+            };
 
-            salvar();
-            textarea.value = '';
-            atualizarClientesCarteira();
-            alert('✓ Observação registrada na timeline!');
+            app.visitas[visitaIdx].timeline.push(novaObs);
+
+            try {
+                await salvar();
+                textarea.value = '';
+                atualizarClientesCarteira();
+                alert('✓ Observação registrada na timeline!');
+            } catch (err) {
+                app.visitas[visitaIdx].timeline.pop();
+                localStorage.setItem('visitas', JSON.stringify(app.visitas));
+                alert('❌ Erro ao salvar observação no banco. Tente novamente.');
+            }
         }
 
         function abrirEdicaoObservacao(visitaIdx, timelineIdx) {
@@ -6158,7 +6301,7 @@
             app.visitaEmRemarcar = null;
         }
 
-        function confirmarRemarcar() {
+        async function confirmarRemarcar() {
             if (app.visitaEmRemarcar === null) return;
 
             const novaData = document.getElementById('novaDataRemarcar').value;
@@ -6173,25 +6316,36 @@
             const visita = app.visitas[app.visitaEmRemarcar];
             const dataAntiga = visita.data;
             const horaAntiga = visita.hora;
+            const statusAntigo = visita.status;
 
             visita.status = 'remarcada';
             visita.data = novaData;
             visita.hora = novaHora || visita.hora;
 
-            visita.timeline.push({
+            const timelineEntry = {
                 data: new Date().toLocaleDateString('pt-BR'),
                 hora: new Date().toLocaleTimeString('pt-BR'),
-                evento: '📅 Remarcada',
+                evento: '\uD83D\uDCC5 Remarcada',
                 descricao: `Visita remarcada de ${new Date(dataAntiga).toLocaleDateString('pt-BR')}${horaAntiga ? ' às ' + horaAntiga : ''} para ${new Date(novaData).toLocaleDateString('pt-BR')}${novaHora ? ' às ' + novaHora : ''}${motivo ? '. Motivo: ' + motivo : ''}`
-            });
+            };
+            visita.timeline.push(timelineEntry);
 
-            salvar();
-            renderCalendar();
-            closeModalRemarcar();
-
-            document.getElementById('novaDataRemarcar').value = '';
-            document.getElementById('novaHoraRemarcar').value = '';
-            document.getElementById('motivoRemarcar').value = '';
+            try {
+                await salvar();
+                renderCalendar();
+                closeModalRemarcar();
+                document.getElementById('novaDataRemarcar').value = '';
+                document.getElementById('novaHoraRemarcar').value = '';
+                document.getElementById('motivoRemarcar').value = '';
+            } catch (err) {
+                // Rollback
+                visita.status = statusAntigo;
+                visita.data = dataAntiga;
+                visita.hora = horaAntiga;
+                visita.timeline.pop();
+                localStorage.setItem('visitas', JSON.stringify(app.visitas));
+                alert('❌ Erro ao remarcar visita no banco. Operação revertida.');
+            }
         }
 
         function alterarStatusProjeto(idx, novoStatus) {
@@ -6347,19 +6501,37 @@
             input.click();
         }
 
-        function deletarVisita(idx) {
-            if (confirm('Deletar esta visita?')) {
-                app.visitas.splice(idx, 1);
-                salvar();
+        async function deletarVisita(idx) {
+            if (!confirm('Deletar esta visita?')) return;
+
+            const [removida] = app.visitas.splice(idx, 1);
+            localStorage.setItem('visitas', JSON.stringify(app.visitas));
+            atualizarClientesCarteira();
+
+            try {
+                await salvar();
+            } catch (err) {
+                app.visitas.splice(idx, 0, removida);
+                localStorage.setItem('visitas', JSON.stringify(app.visitas));
                 atualizarClientesCarteira();
+                alert('❌ Erro ao deletar visita no banco. Operação revertida.');
             }
         }
 
-        function deletarProjeto(idx) {
-            if (confirm('Deletar este projeto?')) {
-                app.projetos.splice(idx, 1);
-                salvar();
+        async function deletarProjeto(idx) {
+            if (!confirm('Deletar este projeto?')) return;
+
+            const [removido] = app.projetos.splice(idx, 1);
+            localStorage.setItem('projetos', JSON.stringify(app.projetos));
+            atualizarProjetosExibicao();
+
+            try {
+                await salvar();
+            } catch (err) {
+                app.projetos.splice(idx, 0, removido);
+                localStorage.setItem('projetos', JSON.stringify(app.projetos));
                 atualizarProjetosExibicao();
+                alert('❌ Erro ao deletar projeto no banco. Operação revertida.');
             }
         }
 
@@ -6795,7 +6967,8 @@
                 faturamentos: app.faturamentos, clientes: app.clientes, projetos: app.projetos,
                 visitas: app.visitas, oportunidades: app.oportunidades, visitasReunioes: app.visitasReunioes
             };
-            fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            // Retorna a Promise para que callers possam fazer await
+            return fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
             .then(() => { _dbSetStatus('conectado', '✅ Salvo no Banco'); if(manual) alert('Salvo no banco de dados com sucesso!'); })
             .catch(() => { _dbSetStatus('erro', '❌ Falha API'); if(manual) alert('Erro ao salvar no banco local (FastAPI OFF).'); });
         }
