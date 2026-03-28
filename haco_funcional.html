@@ -7726,41 +7726,46 @@
         }
 
         function salvarConfigGoogleSheets() {
-            const spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
-            const sheet_name = document.getElementById('gs_sheet_name').value.trim();
-            
-            // Atualiza o campo com o ID limpo
-            document.getElementById('gs_spreadsheet_id').value = spreadsheet_id;
-            
-            const mapping = {
-                'Cliente': document.getElementById('gs_map_cliente').value,
-                'Data': document.getElementById('gs_map_data').value,
-                'Valor': document.getElementById('gs_map_valor').value,
-                'Pedido Haco': document.getElementById('gs_map_pedido').value,
-                'Código ERP': document.getElementById('gs_map_erp').value,
-                'Vendedor': document.getElementById('gs_map_vendedor').value,
-                'Nota Fiscal': document.getElementById('gs_map_nota').value,
-                'Código Etiqueta': document.getElementById('gs_map_etiqueta').value,
-                'Status Pedido': document.getElementById('gs_map_status_ped').value,
-                'Data Entrega': document.getElementById('gs_map_entrega').value
-            };
+            try {
+                const spreadsheet_id = extrairSpreadsheetId(document.getElementById('gs_spreadsheet_id').value);
+                const sheet_name = document.getElementById('gs_sheet_name').value.trim();
+                
+                // Atualiza o campo com o ID limpo
+                document.getElementById('gs_spreadsheet_id').value = spreadsheet_id;
+                
+                const mapping = {
+                    'Cliente': document.getElementById('gs_map_cliente').value,
+                    'Data': document.getElementById('gs_map_data').value,
+                    'Valor': document.getElementById('gs_map_valor').value,
+                    'Pedido Haco': document.getElementById('gs_map_pedido').value,
+                    'Código ERP': document.getElementById('gs_map_erp').value,
+                    'Vendedor': document.getElementById('gs_map_vendedor').value,
+                    'Nota Fiscal': document.getElementById('gs_map_nota').value,
+                    'Código Etiqueta': document.getElementById('gs_map_etiqueta').value,
+                    'Status Pedido': document.getElementById('gs_map_status_ped').value,
+                    'Data Entrega': document.getElementById('gs_map_entrega').value
+                };
 
-            const vendedor_filter = document.getElementById('gs_filter_vendedor').value.trim();
-            const auto_sync = document.getElementById('gs_auto_sync').checked;
+                const vendedor_filter = document.getElementById('gs_filter_vendedor').value.trim();
+                const auto_sync = document.getElementById('gs_auto_sync').checked;
 
-            if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
-                alert('⚠️ Preencha o ID da planilha e mapeie pelo menos Cliente, Data e Valor.');
-                return;
+                if (!spreadsheet_id || !mapping['Cliente'] || !mapping['Data'] || !mapping['Valor']) {
+                    alert('⚠️ Preencha o ID da planilha e mapeie pelo menos Cliente, Data e Valor.');
+                    return;
+                }
+
+                const config = { spreadsheet_id, sheet_name, mapping, vendedor_filter, auto_sync };
+                localStorage.setItem('haco_gsheets_config', JSON.stringify(config));
+                
+                if (auto_sync) iniciarAutoSyncLoop();
+                else pararAutoSyncLoop();
+                
+                alert('✅ Configuração do Google Sheets salva com sucesso!');
+                fecharConfigGoogleSheets();
+            } catch (e) {
+                alert("ERRO CRÍTICO AO SALVAR AS CONFIGURAÇÕES!\nPor favor, me mande print desta mensagem:\n\n" + e.message + "\n\n" + e.stack);
+                console.error("Erro no salvarConfigGoogleSheets:", e);
             }
-
-            const config = { spreadsheet_id, sheet_name, mapping, vendedor_filter, auto_sync };
-            localStorage.setItem('haco_gsheets_config', JSON.stringify(config));
-            
-            if (auto_sync) iniciarAutoSyncLoop();
-            else pararAutoSyncLoop();
-            
-            alert('✅ Configuração do Google Sheets salva com sucesso!');
-            fecharConfigGoogleSheets();
         }
 
         function atualizarToggleVisual(checked) {
