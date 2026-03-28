@@ -799,21 +799,21 @@
                     </div>
                 </div>
                 
-                <div style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border);">
-                    <table style="min-width: 1200px;">
+                <div style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border); padding-bottom: 8px;">
+                    <table style="min-width: 1450px;">
                         <thead>
                             <tr>
-                                <th>Data</th>
-                                <th>Pedido Haco</th>
-                                <th>Cliente</th>
-                                <th>Cód. ERP</th>
-                                <th>Valor</th>
-                                <th>Vendedor</th>
-                                <th>NF</th>
-                                <th>Etiqueta</th>
-                                <th>Status.</th>
-                                <th>Entrega</th>
-                                <th>Ação</th>
+                                <th style="width: 80px;">Data</th>
+                                <th style="width: 100px;">Pedido Haco</th>
+                                <th style="min-width: 180px;">Cliente</th>
+                                <th style="width: 90px;">Cód. ERP</th>
+                                <th style="width: 110px;">Valor</th>
+                                <th style="min-width: 160px;">Vendedor</th>
+                                <th style="width: 80px;">NF</th>
+                                <th style="width: 100px;">Etiqueta</th>
+                                <th style="width: 90px;">Status.</th>
+                                <th style="width: 80px;">Entrega</th>
+                                <th style="width: 260px; text-align: center;">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaFaturamentosDetalhados">
@@ -3254,6 +3254,18 @@
             renderizarPrevisaoCompras();
         }
 
+        function formatarDataVisao(dataStr) {
+            if (!dataStr) return '-';
+            const s = String(dataStr).trim();
+            if (s.includes('/') && s.split('/')[0].length <= 2) return s; // Já está em DD/MM/...
+            const d = new Date(s + 'T12:00:00'); // Evita timezone offset
+            if (!isNaN(d)) return d.toLocaleDateString('pt-BR');
+            // Se falhar o parse ISO fallback com T12, tenta direto:
+            const d2 = new Date(s);
+            if (!isNaN(d2)) return d2.toLocaleDateString('pt-BR');
+            return s; // Fallback para a string original caso seja numero excel
+        }
+
         function atualizarTabelaFaturamentosAno() {
             const tbody = document.getElementById('tabelaFaturamentosDetalhados');
             document.getElementById('tituloFaturamentosDetalhados').textContent = `Faturamentos Inseridos - Ano Completo 2026`;
@@ -3278,17 +3290,17 @@
                     const statusFaturado = f.statusFaturado || 'pendente';
                     return `
                     <tr>
-                        <td>${new Date(f.data).toLocaleDateString('pt-BR')}</td>
+                        <td>${formatarDataVisao(f.data)}</td>
                         <td><strong>${f.pedidoHaco || '-'}</strong></td>
-                        <td>${f.cliente}</td>
+                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;" title="${f.cliente}">${f.cliente}</td>
                         <td><strong>${erp || '-'}</strong></td>
                         <td>R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                        <td>${f.vendedor || '-'}</td>
+                        <td style="white-space: nowrap;">${f.vendedor || '-'}</td>
                         <td>${f.notaFiscal || '-'}</td>
                         <td>${f.codigoEtiqueta || '-'}</td>
                         <td style="font-size:12px">${f.statusPedido || '-'}</td>
-                        <td>${f.dataEntrega ? (isNaN(new Date(f.dataEntrega)) ? f.dataEntrega : new Date(f.dataEntrega).toLocaleDateString('pt-BR')) : '-'}</td>
-                        <td style="display: flex; gap: 10px; align-items: center;">
+                        <td>${formatarDataVisao(f.dataEntrega)}</td>
+                        <td style="display: flex; gap: 8px; align-items: center; justify-content: center; width: 100%;">
                             <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 14px;">
                                 <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pendente</option>
                                 <option value="sim" ${statusFaturado === 'sim' ? 'selected' : ''}>✅ Faturado</option>
