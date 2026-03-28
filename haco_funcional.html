@@ -510,6 +510,58 @@
     .mapping-item { display: flex; flex-direction: column; gap: 5px; }
     .mapping-item label { font-size: 11px; color: var(--text-secondary); }
     .sync-btn-container { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+    
+    /* STYLES PAGINAÇÃO DASHBOARD */
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin-top: 25px;
+        padding: 15px;
+        background: rgba(255,255,255,0.02);
+        border-radius: 12px;
+    }
+    .page-btn {
+        min-width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1.5px solid var(--border);
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .page-btn:hover:not(:disabled) {
+        transform: translateY(-4px) scale(1.05);
+        background: linear-gradient(135deg, #0e6e6e, #1a9a9a);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 8px 20px rgba(14, 110, 110, 0.25);
+    }
+    .page-btn.active {
+        background: linear-gradient(135deg, #0a2540, #0e6e6e);
+        color: white;
+        border-color: transparent;
+        transform: scale(1.15);
+        box-shadow: 0 5px 15px rgba(14, 110, 110, 0.3);
+    }
+    .page-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+    .page-info {
+        font-size: 13px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        margin: 0 15px;
+    }
     </style>
     </style>
 
@@ -765,8 +817,9 @@
                         <tbody id="tabelaFaturamentosDetalhados">
                             <tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido neste mês</td></tr>
                         </tbody>
-                    </table>
                 </div>
+                <!-- PAGINAÇÃO DASHBOARD -->
+                <div id="paginacaoFaturamentoContainer"></div>
             </div>
         </div>
 
@@ -2595,6 +2648,8 @@
             visitasReunioes: JSON.parse(localStorage.getItem('visitasReunioes') || '[]'),
             currentMonth: new Date().getMonth() + 1,
             currentYear: 2026,
+            paginaFaturamentoAtual: 1,
+            itensPorPagina: 25,
             visitaEmRemarcar: null,
             projetoEmTransicao: null
         };
@@ -3187,6 +3242,7 @@
                 document.getElementById('percentualDisplay').textContent = `${percentual}%`;
                 document.getElementById('totalAnualDisplay').textContent = `R$ ${faturamentoAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
 
+                app.paginaFaturamentoAtual = 1; // Reset pagina ao mudar visão
                 atualizarTabelaFaturamentosAno();
                 calcularKPIs(3); // Mostrar KPIs do mês atual (março)
             }
@@ -3201,12 +3257,16 @@
 
             if (app.faturamentos.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido</td></tr>';
-            } else {
                 const totalFaturado = app.faturamentos
                     .filter(f => (f.statusFaturado || 'pendente') === 'sim')
                     .reduce((sum, f) => sum + f.valor, 0);
+
+                // Paginação
+                const totalItens = app.faturamentos.length;
+                const inicio = (app.paginaFaturamentoAtual - 1) * app.itensPorPagina;
+                const faturamentosPaginados = app.faturamentos.slice(inicio, inicio + app.itensPorPagina);
                 
-                tbody.innerHTML = app.faturamentos.map((f, idx) => {
+                tbody.innerHTML = faturamentosPaginados.map((f, idx) => {
                     const clienteData = app.clientes[f.cliente];
                     const erp = clienteData ? clienteData.erp : f.erp;
                     const indiceReal = app.faturamentos.indexOf(f);
@@ -3238,10 +3298,13 @@
                 // Adicionar linha de total
                 tbody.innerHTML += `
                     <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
-                        <td colspan="4" style="text-align: right;">TOTAL:</td>
+                        <td colspan="4" style="text-align: right;">TOTAL GERAL:</td>
                         <td colspan="6">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                 `;
+
+                // Renderiza controles de página
+                renderizarControlesPaginacao(totalItens, 'atualizarTabelaFaturamentosAno');
             }
         }
 
@@ -3317,6 +3380,7 @@
         }
 
         function aplicarFiltroFaturamento() {
+            app.paginaFaturamentoAtual = 1; // Reset pagina ao filtrar
             filtroClienteFaturamentoAtivo = document.getElementById('filtroClienteFaturamento').value;
             const mes = parseInt(document.getElementById('filtroMesDash').value);
             const buscaPedido = document.getElementById('buscaPedidoFaturamento').value.toLowerCase();
@@ -3327,6 +3391,7 @@
         }
 
         function limparFiltroFaturamento() {
+            app.paginaFaturamentoAtual = 1; // Reset pagina ao limpar
             document.getElementById('filtroClienteFaturamento').value = '';
             document.getElementById('buscaPedidoFaturamento').value = '';
             document.getElementById('filtroStatusFaturamento').value = '';
@@ -3597,12 +3662,18 @@
 
             if (faturamentosFiltrados.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento encontrado com os filtros aplicados</td></tr>';
+                document.getElementById('paginacaoFaturamentoContainer').innerHTML = '';
             } else {
                 const totalFaturado = faturamentosFiltrados
                     .filter(f => (f.statusFaturado || 'pendente') === 'sim')
                     .reduce((sum, f) => sum + f.valor, 0);
+
+                // Paginação
+                const totalItens = faturamentosFiltrados.length;
+                const inicio = (app.paginaFaturamentoAtual - 1) * app.itensPorPagina;
+                const faturamentosPaginados = faturamentosFiltrados.slice(inicio, inicio + app.itensPorPagina);
                 
-                tbody.innerHTML = faturamentosFiltrados.map(f => {
+                tbody.innerHTML = faturamentosPaginados.map(f => {
                     const indiceReal = app.faturamentos.indexOf(f);
                     const clienteData = app.clientes[f.cliente];
                     const erp = clienteData ? clienteData.erp : f.erp;
@@ -3633,11 +3704,60 @@
 
                 tbody.innerHTML += `
                     <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
-                        <td colspan="4" style="text-align: right;">TOTAL:</td>
+                        <td colspan="4" style="text-align: right;">TOTAL FILTRADO:</td>
                         <td colspan="6">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                 `;
+
+                // Renderiza controles de página
+                renderizarControlesPaginacao(totalItens, 'renderizarTabelaComFiltro', JSON.stringify([mes, clienteFiltro, buscaPedido, filtroStatus, dataInicial, dataFinal]));
             }
+        }
+
+        // ================================================================
+        // PAGINAÇÃO DASHBOARD
+        // ================================================================
+        function renderizarControlesPaginacao(totalItens, callbackNome, params) {
+            const container = document.getElementById('paginacaoFaturamentoContainer');
+            if (!container) return;
+            
+            const totalPaginas = Math.ceil(totalItens / app.itensPorPagina);
+            if (totalPaginas <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = `
+                <button class="page-btn" ${app.paginaFaturamentoAtual === 1 ? 'disabled' : ''} onclick="mudarPaginaFaturamento(${app.paginaFaturamentoAtual - 1}, '${callbackNome}', ${params})">❮</button>
+                <div class="page-info">Página <b>${app.paginaFaturamentoAtual}</b> de <b>${totalPaginas}</b></div>
+            `;
+
+            // Mostrar até 5 páginas ao redor da atual
+            let start = Math.max(1, app.paginaFaturamentoAtual - 2);
+            let end = Math.min(totalPaginas, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+
+            for (let i = start; i <= end; i++) {
+                html += `<button class="page-btn ${i === app.paginaFaturamentoAtual ? 'active' : ''}" onclick="mudarPaginaFaturamento(${i}, '${callbackNome}', ${params})">${i}</button>`;
+            }
+
+            html += `<button class="page-btn" ${app.paginaFaturamentoAtual === totalPaginas ? 'disabled' : ''} onclick="mudarPaginaFaturamento(${app.paginaFaturamentoAtual + 1}, '${callbackNome}', ${params})">❯</button>`;
+            
+            container.innerHTML = html;
+        }
+
+        function mudarPaginaFaturamento(novaPagina, callbackNome, params) {
+            app.paginaFaturamentoAtual = novaPagina;
+            
+            // Re-executa a função original com os mesmos parâmetros
+            if (callbackNome === 'renderizarTabelaComFiltro') {
+                renderizarTabelaComFiltro(...params);
+            } else if (callbackNome === 'atualizarTabelaFaturamentosAno') {
+                atualizarTabelaFaturamentosAno();
+            }
+
+            // Scroll suave para o topo da tabela
+            document.getElementById('tituloFaturamentosDetalhados').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function preencherClientesFaturamento() {
