@@ -5,8 +5,14 @@ from googleapiclient.discovery import build
 
 logger = logging.getLogger("app.google_sheets")
 
+_sheets_service = None
+
 def get_sheets_service():
-    """ Obter o serviço da API do Google Sheets. Prioriza Conta de Serviço se existir. """
+    """ Obter o serviço da API do Google Sheets. Usa cache para evitar uso massivo de memória. """
+    global _sheets_service
+    if _sheets_service:
+        return _sheets_service
+
     creds_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON_PATH")
     creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
     
@@ -29,12 +35,14 @@ def get_sheets_service():
         # Se não houver credenciais, tenta acesso público via API Key se configurada
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
-            return build('sheets', 'v4', developerKey=api_key)
+            _sheets_service = build('sheets', 'v4', developerKey=api_key)
+            return _sheets_service
         else:
             logger.warning("Nenhuma credencial do Google configurada. Somente acesso limitado disponível.")
             return None
 
-    return build('sheets', 'v4', credentials=creds)
+    _sheets_service = build('sheets', 'v4', credentials=creds)
+    return _sheets_service
 
 def fetch_sheet_data(spreadsheet_id, range_name):
     """ Busca valores de uma planilha específica. """
