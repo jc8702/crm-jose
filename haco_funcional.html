@@ -7995,6 +7995,8 @@
                         hasMore = false;
                     } else {
                         skip += limit;
+                        // Throttling: permite que o backend resida nos acessos sequenciais do Sheets e libere RAM
+                        await new Promise(resolve => setTimeout(resolve, 600));
                     }
                 }
 

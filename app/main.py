@@ -122,6 +122,8 @@ def fetch_spreadsheet_sheets(spreadsheet_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+_header_cache = {}
+
 @app.post("/api/google-sheets/sync")
 async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
     # O payload deve conter: spreadsheet_id, sheet_name, e mapping (ex: { 'Cliente': 'Coluna A', ... })
@@ -136,20 +138,28 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
     if not spreadsheet_id or not mapping:
         raise HTTPException(status_code=400, detail="Faltam parâmetros de configuração.")
     
+    global _header_cache
+    cache_key = f"{spreadsheet_id}_{sheet_name}"
+    
     try:
-        # 1. Busca os cabeçalhos (linha 1)
-        headers = []
-        try:
-            head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
-            if head_data: headers = head_data[0]
-        except Exception as e:
-            # Fallback para a primeira aba
-            from .google_sheets import get_sheets_service
-            service = get_sheets_service()
-            metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-            sheet_name = metadata['sheets'][0]['properties']['title']
-            head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
-            if head_data: headers = head_data[0]
+        # 1. Busca os cabeçalhos (linha 1) com cache para não sobrecarregar API em paginação
+        headers = _header_cache.get(cache_key, [])
+        if not headers:
+            try:
+                head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
+                if head_data: 
+                    headers = head_data[0]
+                    _header_cache[cache_key] = headers
+            except Exception as e:
+                # Fallback para a primeira aba
+                from .google_sheets import get_sheets_service
+                service = get_sheets_service()
+                metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+                sheet_name = metadata['sheets'][0]['properties']['title']
+                head_data = fetch_sheet_data(spreadsheet_id, f"'{sheet_name}'!A1:Z1")
+                if head_data: 
+                    headers = head_data[0]
+                    _header_cache[cache_key] = headers
         
         if not headers:
             return {"message": "Planilha vazia ou sem cabeçalho."}
