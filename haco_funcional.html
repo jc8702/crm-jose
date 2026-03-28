@@ -20,6 +20,7 @@
             --accent:         #f97316;
             --success:        #10b981;
             --warning:        #f59e0b;
+            --warning-light:  #fff3cd;
             --danger:         #ef4444;
             --light-bg:       #f1f5f9;
             --bg-section:     #f1f5f9;
@@ -52,6 +53,7 @@
             --text-secondary: #8b949e;
             --text-muted:     #6e7681;
             --primary-light:  rgba(29,78,216,0.15);
+            --warning-light:  rgba(245, 158, 11, 0.15);
         }
         body {
             font-family: var(--font);
@@ -3969,7 +3971,7 @@
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Nenhum cliente cadastrado</td></tr>';
             } else {
                 tbody.innerHTML = clientes.map(([nome, dados], idx) => {
-                    const rowBg = dados.pre_cadastro ? 'background-color: #fff3cd;' : '';
+                    const rowBg = dados.pre_cadastro ? 'background-color: var(--warning-light);' : '';
                     const alertIcon = dados.pre_cadastro ? '<span title="Pré-cadastro: complete as informações" style="cursor:help;">⚠️</span> ' : '';
                     const btnLabel = dados.pre_cadastro ? '📝 Completar' : 'Editar';
                     const erpDisplay = dados.erp || '<span style="color:#d32f2f; font-size:11px;">Sem ERP</span>';
