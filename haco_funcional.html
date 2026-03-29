@@ -7476,101 +7476,119 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                    const sheetName = workbook.SheetNames[0];
-                    const sheet = workbook.Sheets[sheetName];
-                    const rows = XLSX.utils.sheet_to_json(sheet, { raw: true, defval: '' });
 
-                    if (!rows || rows.length === 0) {
-                        alert('Planilha vazia ou sem dados válidos.');
-                        return;
-                    }
+                    let importDadosAdicionados = [];
+                    let abasLidas = [];
 
-                    const keys = Object.keys(rows[0]);
-                    const colCliente  = encontrarColuna(keys, ['cliente', 'conta', 'client', 'nome', 'razaosocial', 'empresa']);
-                    const colData     = encontrarColuna(keys, ['data', 'datafaturamento', 'date', 'data_faturamento']);
-                    const colValor    = encontrarColuna(keys, ['valor', 'value', 'valorfaturamento', 'valor_faturamento', 'total', 'montante']);
-                    const colPedido   = encontrarColuna(keys, ['pedido', 'pedidohaco', 'numeropedido', 'order', 'pedido_haco', 'haco']);
+                    workbook.SheetNames.forEach(sheetName => {
+                        const sheet = workbook.Sheets[sheetName];
+                        const rows = XLSX.utils.sheet_to_json(sheet, { raw: true, defval: '' });
 
-                    if (!colCliente || !colData || !colValor) {
-                        alert(`Não encontrei as colunas obrigatórias.\n\nColunas encontradas: ${keys.join(', ')}\n\nA planilha deve ter colunas chamadas: Cliente, Data, Valor (e opcionalmente: Pedido Haco)`);
-                        return;
-                    }
+                        if (!rows || rows.length === 0) return;
 
-                    document.getElementById('importArquivoLinhas').textContent = `${rows.length} linha(s) encontrada(s) — Aba: ${sheetName}`;
+                        const keys = Object.keys(rows[0]);
+                        const colCliente  = encontrarColuna(keys, ['cliente', 'conta', 'client', 'nome', 'razaosocial', 'empresa']);
+                        const colData     = encontrarColuna(keys, ['data', 'datafaturamento', 'date', 'data_faturamento']);
+                        const colValor    = encontrarColuna(keys, ['valor', 'value', 'valorfaturamento', 'valor_faturamento', 'total', 'montante']);
+                        const colPedido   = encontrarColuna(keys, ['pedido', 'pedidohaco', 'numeropedido', 'order', 'pedido_haco', 'haco']);
 
-                    importDadosProcessados = rows.map((row, idx) => {
-                        const nomeCliente = (row[colCliente] || '').toString().trim();
-                        const valData     = row[colData];
-                        const valValor    = row[colValor];
-                        const pedido      = colPedido ? (row[colPedido] || '').toString().trim() : '';
+                        if (!colCliente || !colData || !colValor) {
+                            return; // Ignora esta aba pois não tem as colunas obrigatórias
+                        }
 
-                        // Normaliza data
-                        let dataISO = '';
-                        if (valData instanceof Date) {
-                            // Se for objeto Date do SheetJS (usando cellDates: true)
-                            const d = valData.getUTCDate();
-                            const m = valData.getUTCMonth() + 1;
-                            const y = valData.getUTCFullYear();
-                            dataISO = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                        } else {
-                            const dataRaw = (valData || '').toString().trim();
-                            if (dataRaw) {
-                                // Tenta dd/mm/aaaa
-                                const partsBR = dataRaw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-                                if (partsBR) {
-                                    const [, d, m, a] = partsBR;
-                                    const ano = a.length === 2 ? '20' + a : a;
-                                    dataISO = `${ano}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-                                } else if (/^\d{4}-\d{2}-\d{2}/.test(dataRaw)) {
-                                    dataISO = dataRaw.substring(0, 10);
-                                } else {
-                                    // Tenta parse genérico
-                                    const dObj = new Date(dataRaw);
-                                    if (!isNaN(dObj)) dataISO = dObj.toISOString().substring(0, 10);
+                        const abaProcessada = rows.map((row, originalIdx) => {
+                            const nomeCliente = (row[colCliente] || '').toString().trim();
+                            const valData     = row[colData];
+                            const valValor    = row[colValor];
+                            const pedido      = colPedido ? (row[colPedido] || '').toString().trim() : '';
+
+                            // Normaliza data
+                            let dataISO = '';
+                            let dataRawStr = '';
+
+                            if (valData instanceof Date) {
+                                // Se for objeto Date do SheetJS (usando cellDates: true)
+                                const d = valData.getUTCDate();
+                                const m = valData.getUTCMonth() + 1;
+                                const y = valData.getUTCFullYear();
+                                dataISO = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                                dataRawStr = dataISO.split('-').reverse().join('/');
+                            } else {
+                                dataRawStr = (valData || '').toString().trim();
+                                if (dataRawStr) {
+                                    // Tenta dd/mm/aaaa
+                                    const partsBR = dataRawStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+                                    if (partsBR) {
+                                        const [, d, m, a] = partsBR;
+                                        const ano = a.length === 2 ? '20' + a : a;
+                                        dataISO = `${ano}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+                                    } else if (/^\d{4}-\d{2}-\d{2}/.test(dataRawStr)) {
+                                        dataISO = dataRawStr.substring(0, 10);
+                                    } else {
+                                        // Tenta parse genérico
+                                        const dObj = new Date(dataRawStr);
+                                        if (!isNaN(dObj)) dataISO = dObj.toISOString().substring(0, 10);
+                                    }
                                 }
                             }
-                        }
 
-                        let valor = 0;
-                        if (typeof valValor === 'number') {
-                            valor = valValor;
-                        } else {
-                            const valorRaw = (valValor || '').toString().trim().replace(/[R$\s.]/g, '').replace(',', '.');
-                            valor = parseFloat(valorRaw);
-                        }
-
-                        // Validação
-                        const erros = [];
-                        let erp = '';
-
-                        if (!nomeCliente) erros.push('Cliente vazio');
-                        if (!dataISO) erros.push('Data inválida: ' + valData);
-                        if (isNaN(valor) || valor <= 0) erros.push('Valor inválido: ' + valValor);
-
-                        // Verifica se cliente existe (busca case-insensitive)
-                        if (nomeCliente) {
-                            const clienteKey = Object.keys(app.clientes).find(
-                                k => k.toLowerCase() === nomeCliente.toLowerCase()
-                            );
-                            if (clienteKey) {
-                                erp = app.clientes[clienteKey].erp || '';
-                                if (!erp) erros.push('Cliente sem código ERP');
+                            let valor = 0;
+                            if (typeof valValor === 'number') {
+                                valor = valValor;
                             } else {
-                                erros.push('Cliente não cadastrado no CRM');
+                                const valorRawStr = (valValor || '').toString().trim().replace(/[R$\s.]/g, '').replace(',', '.');
+                                valor = parseFloat(valorRawStr);
                             }
-                        }
 
-                        return {
-                            idx,
-                            nomeCliente,
-                            dataISO,
-                            dataRaw,
-                            valor,
-                            pedido: pedido || '-',
-                            erp,
-                            valido: erros.length === 0,
-                            erros
-                        };
+                            // Validação
+                            const erros = [];
+                            let erp = '';
+
+                            if (!nomeCliente) erros.push('Cliente vazio');
+                            if (!dataISO) erros.push('Data inválida: ' + dataRawStr);
+                            if (isNaN(valor) || valor <= 0) erros.push('Valor inválido: ' + valValor);
+
+                            // Verifica se cliente existe (busca case-insensitive)
+                            if (nomeCliente) {
+                                const clienteKey = Object.keys(app.clientes).find(
+                                    k => k.toLowerCase() === nomeCliente.toLowerCase()
+                                );
+                                if (clienteKey) {
+                                    erp = app.clientes[clienteKey].erp || '';
+                                    if (!erp) erros.push('Cliente sem código ERP');
+                                } else {
+                                    erros.push('Cliente não cadastrado no CRM');
+                                }
+                            }
+
+                            return {
+                                aba: sheetName,
+                                originalIdx,
+                                nomeCliente,
+                                dataISO,
+                                dataRaw: dataRawStr,
+                                valor,
+                                pedido: pedido || '-',
+                                erp,
+                                valido: erros.length === 0,
+                                erros
+                            };
+                        });
+
+                        importDadosAdicionados = importDadosAdicionados.concat(abaProcessada);
+                        abasLidas.push(sheetName);
+                    });
+
+                    if (importDadosAdicionados.length === 0) {
+                        alert('Nenhuma aba da planilha possui as colunas obrigatórias!\n\nCertifique-se que alguma aba tenha as colunas: Cliente, Data, Valor');
+                        return;
+                    }
+
+                    document.getElementById('importArquivoLinhas').textContent = `${importDadosAdicionados.length} linha(s) processadas em ${abasLidas.length} aba(s)`;
+
+                    importDadosProcessados = importDadosAdicionados.map((item, index) => {
+                        item.idx = index;
+                        return item;
                     });
 
                     renderizarPreviewImport();
