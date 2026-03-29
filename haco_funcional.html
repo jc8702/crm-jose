@@ -64,8 +64,8 @@
             left: 0; top: 0;
             height: 100vh;
             overflow-y: auto;
-            transition: transform 0.3s ease;
-            z-index: 999;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
             display: flex;
             flex-direction: column;
         }
@@ -136,9 +136,32 @@
         .content-wrapper {
             flex: 1;
             margin-left: var(--sidebar-w);
-            transition: margin-left 0.3s ease;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .content-wrapper.expanded { margin-left: 0; }
+        .sidebar.collapsed { transform: translateX(-100%); }
+        
+        /* Botão Hamburguer Desktop */
+        .desktop-toggle {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: var(--primary);
+            color: #121212;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(255,122,0,0.3);
+            transition: all 0.2s;
+        }
+        .desktop-toggle:hover { transform: scale(1.05); background: #ffa559; }
         .container {
             max-width: 1440px;
             margin: 0 auto;
@@ -598,7 +621,8 @@
 
     <title>HACO RFID - Gestão de Carteira e Projetos - José Carlos</title>
 </head>
-<body>
+
+
     <!-- SIDEBAR MENU -->
     <!-- SIDEBAR OVERLAY -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -645,7 +669,7 @@
     </div>
 
     <!-- TOGGLE BUTTON -->
-    <button class="toggle-sidebar" id="toggleBtn" onclick="toggleSidebar()">☰</button>
+    <button class="desktop-toggle" onclick="toggleSidebar()" title="Expandir/Recolher Menu">☰</button>
 
     <!-- MAIN CONTENT -->
     <div class="content-wrapper" id="contentWrapper">
@@ -850,32 +874,7 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="form-group">
-                        <label>Vendedor</label>
-                        <input type="text" id="vendedorFaturamento" placeholder="Nome do vendedor">
-                    </div>
-                    <div class="form-group">
-                        <label>Nota Fiscal</label>
-                        <input type="text" id="notaFaturamento" placeholder="Número da NF">
-                    </div>
-                </div>
 
-                <div class="row">
-                   <div class="form-group">
-                        <label>Status do Pedido</label>
-                        <select id="statusPedFaturamento">
-                            <option value="Agendado">Agendado</option>
-                            <option value="Produção">Produção</option>
-                            <option value="Finalizado">Finalizado</option>
-                            <option value="Cancelado">Cancelado</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Data de Entrega</label>
-                        <input type="date" id="entregaFaturamento">
-                    </div>
-                </div>
 
                 <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 8px;">
                     <button class="btn-primary" onclick="salvarFaturamento()">✓ Registrar Faturamento</button>
@@ -2607,6 +2606,29 @@
     </div>
 
     <script>
+        const nomesMeses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        const metas = {
+            1: 85542, 2: 122240, 3: 485664, 4: 90000, 5: 110000, 6: 150000,
+            7: 130000, 8: 140000, 9: 160000, 10: 180000, 11: 200000, 12: 250000
+        };
+        const metasMensais = Object.values(metas);
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const wrapper = document.getElementById('contentWrapper');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            // Mobile logic
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('visible');
+                overlay.classList.toggle('active');
+            } else {
+                // Desktop logic
+                sidebar.classList.toggle('collapsed');
+                wrapper.classList.toggle('expanded');
+            }
+        }
+
         const clientesComErp = {
             "Halave Confecções": {erp: "812164", cidade: "Blumenau", estado: "SC"},
             "Filt Surf Wear": {erp: "45981", cidade: "Blumenau", estado: "SC"},
@@ -2616,14 +2638,6 @@
             "Jane Kelly (Star Jane)": {erp: "81974", cidade: "Manaus", estado: "AM"}
         };
 
-        const metas = {
-            1: 356153.56, 2: 453286.35, 3: 485663.95, 4: 596557.22, 5: 596557.22, 6: 679929.53,
-            7: 647551.94, 8: 728495.93, 9: 728495.93, 10: 663740.73, 11: 663740.73, 12: 596557.22
-        };
-        
-        const metasMensais = [356153.56, 453286.35, 485663.95, 596557.22, 596557.22, 679929.53, 647551.94, 728495.93, 728495.93, 663740.73, 663740.73, 596557.22];
-
-        const nomesMeses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
         const estadosBR = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
         
         const cidadesPorEstado = {
@@ -2655,6 +2669,7 @@
             "SE": ["Aracaju", "Nossa Senhora do Socorro", "Barra dos Coqueiros", "Lagarto", "Simão Dias"],
             "TO": ["Palmas", "Araguaína", "Araguatins", "Paraíso do Tocantins", "Gurupi", "Miracema do Tocantins"]
         };
+
 
         let app = {
             faturamentos: JSON.parse(localStorage.getItem('faturamentos') || '[]'),
@@ -3499,7 +3514,6 @@
             const resumoEl = document.getElementById('resumoMesPrevisao');
             if (!cont) return;
 
-            const nomesMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
             const recorrenciaLabel = { mensal:'Mensal', bimestral:'Bimestral', trimestral:'Trimestral', semestral:'Semestral', anual:'Anual' };
             const hoje = new Date(); hoje.setHours(0,0,0,0);
 
@@ -3819,22 +3833,15 @@
                 return;
             }
 
-            const vendedor = document.getElementById('vendedorFaturamento').value;
-            const notaFiscal = document.getElementById('notaFaturamento').value;
-            const statusPedido = document.getElementById('statusPedFaturamento').value;
-            const dataEntrega = document.getElementById('entregaFaturamento').value;
-
             const novoFat = {
                 cliente, erp, valor, data,
                 pedidoHaco: pedidoHaco || '-',
-                vendedor: vendedor || '-',
-                notaFiscal: notaFiscal || '-',
-                statusPedido: statusPedido || 'Agendado',
-                dataEntrega: dataEntrega || data
+                vendedor: '-',
+                notaFiscal: '-',
+                statusPedido: 'Agendado',
+                dataEntrega: data,
+                codigoEtiqueta: '-'
             };
-            
-            // Note: codigoEtiqueta is no longer used but we keep the structure for now
-            novoFat.codigoEtiqueta = '-';
 
             app.faturamentos.push(novoFat);
             atualizarDashboard();
@@ -7757,16 +7764,22 @@
                         </label>
                     `;
                 });
-                const firstSelected = document.querySelector('.chk-gs-sheet:checked')?.value || sheetsData.sheets[0];
-                const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${firstSelected}`);
-                const dataResp = await response.json();
-                if (!response.ok) {
-                    console.error('Fetch headers error:', dataResp.detail);
-                    document.getElementById('gs_mapping_container').style.display = 'none';
-                    return; 
+                const selectedSheets = Array.from(document.querySelectorAll('.chk-gs-sheet:checked')).map(cb => cb.value);
+                if (selectedSheets.length === 0) throw new Error('Selecione pelo menos uma aba.');
+
+                let allHeaders = new Set();
+                for (const sheetName of selectedSheets) {
+                    const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${sheetName}`);
+                    if (response.ok) {
+                        const dataResp = await response.json();
+                        if (dataResp.headers) {
+                            dataResp.headers.forEach(h => allHeaders.add(h));
+                        }
+                    }
                 }
-                const headers = dataResp.headers;
-                if (!headers || headers.length === 0) throw new Error('Planilha vazia ou sem cabeçalhos.');
+
+                const headers = Array.from(allHeaders);
+                if (headers.length === 0) throw new Error('Nenhuma das abas selecionadas possui cabeçalhos ou dados.');
                 const fields = ['cliente', 'valor', 'pedido', 'erp', 'vendedor', 'nota', 'status_ped', 'entrega'];
                 const mapping = config.mapping || {};
                 fields.forEach(f => {
@@ -7961,8 +7974,8 @@
             const ANO_FILTRO = 2026;
 
             try {
-                let skip = 2; // Começa na linha 2 (ignorando header naturo)
-                const limit = 500;
+                let skip = 2; // Começa na linha 2 (ignorando header nativo)
+                const limit = 200;
                 let hasMore = true;
                 
                 let totalNovos = 0;

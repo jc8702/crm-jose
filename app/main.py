@@ -189,9 +189,11 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
 
             if skip and limit:
                 start_row = max(2, int(skip))
-                range_name = f"'{sheet_name}'!A{start_row}:Z{start_row + int(limit) - 1}"
+                # Limite de segurança para evitar estourar memória no Render (máximo 300 por lote)
+                safe_limit = min(int(limit), 201)
+                range_name = f"'{sheet_name}'!A{start_row}:Z{start_row + safe_limit - 1}"
             else:
-                range_name = f"'{sheet_name}'!A2:Z501"
+                range_name = f"'{sheet_name}'!A2:Z201"
 
             data = fetch_sheet_data(spreadsheet_id, range_name)
             rows = data if data else []
@@ -217,10 +219,15 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
                         continue
                         
                 if entry:
-                    entry['abaGoogleSheets'] = sheet_name
-                    results.append(entry)
+                    # Garantir que a linha não esteja vazia (ex: pelo menos cliente ou valor)
+                    if entry.get('nomeCliente') or entry.get('valor'):
+                        entry['abaGoogleSheets'] = sheet_name
+                        results.append(entry)
 
-        gc.collect()
+            # Limpando memória do lote
+            rows = None
+            data = None
+            gc.collect()
         return {
             "message": f"Sincronizados {len(results)} registros com sucesso!",
             "data": results,
