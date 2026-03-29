@@ -883,38 +883,7 @@
                     <button class="btn-primary" onclick="abrirConfigGoogleSheets()" style="background: var(--text-secondary); display: flex; align-items: center; gap: 8px;">⚙️ Configurar Planilha</button>
                     <button class="btn-primary" onclick="abrirModalImportarPlanilha()" style="background: linear-gradient(135deg, #0e6e6e, #0a4d4d); display: flex; align-items: center; gap: 8px; opacity: 0.7;">📥 Importar Manual (Excel)</button>
                 </div>
-                <div id="resultadoFaturamento" style="display: none; margin-top: 20px;"></div>
-            </div>
-
-            <!-- Tabela de Faturamentos na própria tela de Faturamento -->
-            <div class="section" style="margin-top: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-                    <h2 style="margin: 0;">📋 Faturamentos Recentes</h2>
-                    <div style="font-size: 13px; color: var(--text-secondary);">Exibindo mesmos dados do Dashboard</div>
-                </div>
-                
-                <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                    <table style="width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0;">
-                        <thead>
-                            <tr>
-                                <th>📅 Data</th>
-                                <th>📦 Pedido</th>
-                                <th>👤 Cliente</th>
-                                <th>🆔 ERP</th>
-                                <th>💰 Valor</th>
-                                <th>👤 Vend.</th>
-                                <th>🧾 NF</th>
-                                <th>⚙️ Status</th>
-                                <th>🚚 Entrega</th>
-                                <th style="text-align: center;">⚙️ Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabelaFaturamentosManual">
-                            <!-- Populated via atualizarDashboard -->
-                        </tbody>
-                    </table>
-                </div>
-                <div id="paginacaoFaturamentoManualContainer" style="margin-top: 20px;"></div>
+            <div id="resultadoFaturamento" style="display: none; margin-top: 20px;"></div>
             </div>
         </div>
 
@@ -3748,21 +3717,8 @@
 
                 // Renderiza controles de página
                 const _mesAtual = mes, _cliAtual = clienteFiltro, _busAtual = buscaPedido, _stAtual = filtroStatus, _diAtual = dataInicial, _dfAtual = dataFinal;
-                
-                // Popula a tabela secundária na tela de Faturamentos Manual se o elemento existir
-                const tbodyManual = document.getElementById('tabelaFaturamentosManual');
-                if (tbodyManual) {
-                    tbodyManual.innerHTML = tbody.innerHTML;
-                    // Se precisar de botões idênticos que funcionem, eles já estão usando funções globais.
-                }
 
                 renderizarControlesPaginacao(totalItens, () => renderizarTabelaComFiltro(_mesAtual, _cliAtual, _busAtual, _stAtual, _diAtual, _dfAtual));
-                
-                // Paginacao para a tabela manual se existir
-                const pagContainer = document.getElementById('paginacaoFaturamentoManualContainer');
-                if (pagContainer) {
-                    pagContainer.innerHTML = document.getElementById('paginacaoFaturamentoContainer').innerHTML;
-                }
             }
         }
 
@@ -7801,6 +7757,8 @@
                         </label>
                     `;
                 });
+                const firstSelected = document.querySelector('.chk-gs-sheet:checked')?.value || sheetsData.sheets[0];
+                const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${firstSelected}`);
                 const dataResp = await response.json();
                 if (!response.ok) {
                     console.error('Fetch headers error:', dataResp.detail);
