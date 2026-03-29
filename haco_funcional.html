@@ -3231,7 +3231,7 @@
                 document.getElementById('percentualDisplay').textContent = `${percentual}%`;
                 document.getElementById('totalAnualDisplay').textContent = `R$ ${totalAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
 
-                atualizarTabelaFaturamentos(mes);
+                atualizarTabelaFaturamentos();
                 calcularKPIs(mes);
             } else {
                 // Ano completo
@@ -3248,7 +3248,7 @@
                 document.getElementById('totalAnualDisplay').textContent = `R$ ${faturamentoAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
 
                 app.paginaFaturamentoAtual = 1; // Reset pagina ao mudar visão
-                atualizarTabelaFaturamentosAno();
+                atualizarTabelaFaturamentos();
                 calcularKPIs(3); // Mostrar KPIs do mês atual (março)
             }
             
@@ -3270,68 +3270,9 @@
             return s; // Fallback para a string original caso seja numero excel
         }
 
-        function atualizarTabelaFaturamentosAno() {
-            const tbody = document.getElementById('tabelaFaturamentosDetalhados');
-            document.getElementById('tituloFaturamentosDetalhados').textContent = `Faturamentos Inseridos - Ano Completo 2026`;
-
-            if (app.faturamentos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido</td></tr>';
-                document.getElementById('paginacaoFaturamentoContainer').innerHTML = '';
-            } else {
-                const totalFaturado = app.faturamentos
-                    .filter(f => (f.statusFaturado || 'pendente') === 'sim')
-                    .reduce((sum, f) => sum + f.valor, 0);
-
-                // Paginação
-                const totalItens = app.faturamentos.length;
-                const inicio = (app.paginaFaturamentoAtual - 1) * app.itensPorPagina;
-                const faturamentosPaginados = app.faturamentos.slice(inicio, inicio + app.itensPorPagina);
-                
-                tbody.innerHTML = faturamentosPaginados.map((f, idx) => {
-                    const clienteData = app.clientes[f.cliente];
-                    const erp = clienteData ? clienteData.erp : f.erp;
-                    const indiceReal = app.faturamentos.indexOf(f);
-                    const statusFaturado = f.statusFaturado || 'pendente';
-                    return `
-                    <tr>
-                        <td>${formatarDataVisao(f.data)}</td>
-                        <td><strong>${f.pedidoHaco || '-'}</strong></td>
-                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;" title="${f.cliente}">${f.cliente}</td>
-                        <td><strong>${erp || '-'}</strong></td>
-                        <td style="white-space: nowrap;">R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${f.vendedor}">${f.vendedor || '-'}</td>
-                        <td>${f.notaFiscal || '-'}</td>
-                        <td>${f.codigoEtiqueta || '-'}</td>
-                        <td style="font-size:12px">${f.statusPedido || '-'}</td>
-                        <td>${formatarDataVisao(f.dataEntrega)}</td>
-                        <td style="white-space: nowrap; text-align: center;">
-                            <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="display: inline-block; vertical-align: middle; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 11.5px; width: 105px; margin-right: 4px;">
-                                <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pende.</option>
-                                <option value="sim" ${statusFaturado === 'sim' ? 'selected' : ''}>✅ Faturad.</option>
-                                <option value="nao" ${statusFaturado === 'nao' ? 'selected' : ''}>❌ Ñ Fatur.</option>
-                            </select>
-                            <button class="btn-success" style="display: inline-block; vertical-align: middle; margin-right: 4px; padding: 4px 8px;" onclick="abrirModalEditarFaturamento(${indiceReal})" title="Editar">✏️</button>
-                            <button class="btn-danger" style="display: inline-block; vertical-align: middle; padding: 4px 8px;" onclick="deletarFaturamento(${indiceReal})" title="Deletar">🗑️</button>
-                        </td>
-                    </tr>
-                `}).join('');
-                
-                // Adicionar linha de total
-                tbody.innerHTML += `
-                    <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
-                        <td colspan="4" style="text-align: right;">TOTAL GERAL:</td>
-                        <td colspan="6">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    </tr>
-                `;
-
-                // Renderiza controles de página
-                renderizarControlesPaginacao(totalItens, atualizarTabelaFaturamentosAno);
-            }
-        }
-
-        function atualizarTabelaFaturamentos(mes) {
+        function atualizarTabelaFaturamentos() {
             preencherFiltroClienteFaturamento();
-            renderizarTabelaComFiltro(mes, '', '', '', '', '');
+            aplicarFiltroFaturamento();
         }
 
         function renderChart() {
@@ -3403,7 +3344,8 @@
         function aplicarFiltroFaturamento() {
             app.paginaFaturamentoAtual = 1; // Reset pagina ao filtrar
             filtroClienteFaturamentoAtivo = document.getElementById('filtroClienteFaturamento').value;
-            const mes = parseInt(document.getElementById('filtroMesDash').value);
+            const tipoPeriodo = document.getElementById('filtroTipoPeriodo').value;
+            const mes = tipoPeriodo === 'ano' ? 'ano' : parseInt(document.getElementById('filtroMesDash').value);
             const buscaPedido = document.getElementById('buscaPedidoFaturamento').value.toLowerCase();
             const filtroStatus = document.getElementById('filtroStatusFaturamento').value;
             const dataInicial = document.getElementById('filtroDataInicial').value;
@@ -3419,7 +3361,8 @@
             document.getElementById('filtroDataInicial').value = '';
             document.getElementById('filtroDataFinal').value = '';
             filtroClienteFaturamentoAtivo = '';
-            const mes = parseInt(document.getElementById('filtroMesDash').value);
+            const tipoPeriodo = document.getElementById('filtroTipoPeriodo').value;
+            const mes = tipoPeriodo === 'ano' ? 'ano' : parseInt(document.getElementById('filtroMesDash').value);
             renderizarTabelaComFiltro(mes, '', '', '', '', '');
         }
 
@@ -3640,7 +3583,23 @@
 
 
         function renderizarTabelaComFiltro(mes, clienteFiltro, buscaPedido = '', filtroStatus = '', dataInicial = '', dataFinal = '') {
-            let faturamentosFiltrados = app.faturamentos.filter(f => new Date(f.data).getMonth() + 1 === mes);
+            let faturamentosFiltrados = app.faturamentos;
+
+            if (mes !== 'ano') {
+                faturamentosFiltrados = faturamentosFiltrados.filter(f => {
+                    if (!f.data) return false;
+                    let m = NaN;
+                    let dStr = String(f.data).trim();
+                    if (/^\d{4}-\d{2}-\d{2}/.test(dStr)) {
+                        m = parseInt(dStr.split('-')[1]);
+                    } else if (dStr.includes('/') && dStr.split('/')[0].length <= 2) {
+                        m = parseInt(dStr.split('/')[1]);
+                    } else {
+                        m = new Date(dStr).getMonth() + 1;
+                    }
+                    return !isNaN(m) && m === mes;
+                });
+            }
             
             // Aplicar filtro de cliente se houver
             if (clienteFiltro) {
@@ -3663,16 +3622,31 @@
             
             // Aplicar filtro de data se houver
             if (dataInicial) {
-                faturamentosFiltrados = faturamentosFiltrados.filter(f => f.data >= dataInicial);
+                faturamentosFiltrados = faturamentosFiltrados.filter(f => {
+                    // Transforma f.data para YYYY-MM-DD para garantir conversao alfanumerica caso venha DD/MM/YYYY
+                    let dt = f.data;
+                    if (dt.includes('/') && dt.split('/')[0].length <= 2) {
+                        const parts = dt.split('/');
+                        dt = `${parts[2].substr(0,4)}-${parts[1]}-${parts[0]}`;
+                    }
+                    return dt >= dataInicial;
+                });
             }
             if (dataFinal) {
-                faturamentosFiltrados = faturamentosFiltrados.filter(f => f.data <= dataFinal);
+                faturamentosFiltrados = faturamentosFiltrados.filter(f => {
+                    let dt = f.data;
+                    if (dt.includes('/') && dt.split('/')[0].length <= 2) {
+                        const parts = dt.split('/');
+                        dt = `${parts[2].substr(0,4)}-${parts[1]}-${parts[0]}`;
+                    }
+                    return dt <= dataFinal;
+                });
             }
 
             const tbody = document.getElementById('tabelaFaturamentosDetalhados');
             const nomesMeses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
             
-            let titulo = `Faturamentos Inseridos - ${nomesMeses[mes]} 2026`;
+            let titulo = mes === 'ano' ? `Faturamentos Inseridos - Ano Completo 2026` : `Faturamentos Inseridos - ${nomesMeses[mes]} 2026`;
             if (clienteFiltro) titulo += ` (${clienteFiltro})`;
             if (buscaPedido) titulo += ` - Pedido: ${buscaPedido}`;
             if (filtroStatus) {
@@ -3701,24 +3675,24 @@
                     const statusFaturado = f.statusFaturado || 'pendente';
                     return `
                     <tr>
-                        <td>${new Date(f.data).toLocaleDateString('pt-BR')}</td>
+                        <td>${formatarDataVisao(f.data)}</td>
                         <td><strong>${f.pedidoHaco || '-'}</strong></td>
-                        <td>${f.cliente}</td>
+                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;" title="${f.cliente}">${f.cliente}</td>
                         <td><strong>${erp || '-'}</strong></td>
-                        <td>R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                        <td>${f.vendedor || '-'}</td>
+                        <td style="white-space: nowrap;">R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${f.vendedor}">${f.vendedor || '-'}</td>
                         <td>${f.notaFiscal || '-'}</td>
                         <td>${f.codigoEtiqueta || '-'}</td>
-                        <td style="font-size:11px">${f.statusPedido || '-'}</td>
-                        <td>${f.dataEntrega ? (isNaN(new Date(f.dataEntrega)) ? f.dataEntrega : new Date(f.dataEntrega).toLocaleDateString('pt-BR')) : '-'}</td>
-                        <td style="display: flex; gap: 10px; align-items: center;">
-                            <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 14px;">
-                                <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pendente</option>
-                                <option value="sim" ${statusFaturado === 'sim' ? 'selected' : ''}>✅ Faturado</option>
-                                <option value="nao" ${statusFaturado === 'nao' ? 'selected' : ''}>❌ Não Faturado</option>
+                        <td style="font-size:12px">${f.statusPedido || '-'}</td>
+                        <td>${formatarDataVisao(f.dataEntrega)}</td>
+                        <td style="white-space: nowrap; text-align: center;">
+                            <select onchange="mudarStatusFaturamento(${indiceReal}, this.value)" style="display: inline-block; vertical-align: middle; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); font-size: 11.5px; width: 105px; margin-right: 4px;">
+                                <option value="pendente" ${statusFaturado === 'pendente' ? 'selected' : ''}>⏳ Pende.</option>
+                                <option value="sim" ${statusFaturado === 'sim' ? 'selected' : ''}>✅ Faturad.</option>
+                                <option value="nao" ${statusFaturado === 'nao' ? 'selected' : ''}>❌ Ñ Fatur.</option>
                             </select>
-                            <button class="btn-success" onclick="abrirModalEditarFaturamento(${indiceReal})">Editar</button>
-                            <button class="btn-danger" onclick="deletarFaturamento(${indiceReal})">Deletar</button>
+                            <button class="btn-success" style="display: inline-block; vertical-align: middle; margin-right: 4px; padding: 4px 8px;" onclick="abrirModalEditarFaturamento(${indiceReal})" title="Editar">✏️</button>
+                            <button class="btn-danger" style="display: inline-block; vertical-align: middle; padding: 4px 8px;" onclick="deletarFaturamento(${indiceReal})" title="Deletar">🗑️</button>
                         </td>
                     </tr>
                 `}).join('');
