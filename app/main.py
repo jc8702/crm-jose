@@ -158,7 +158,6 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
         'Código ERP': 'erp',
         'Vendedor': 'vendedor',
         'Nota Fiscal': 'notaFiscal',
-        'Código Etiqueta': 'codigoEtiqueta',
         'Status Pedido': 'statusPedido',
         'Data Entrega': 'dataEntrega'
     }
@@ -192,7 +191,7 @@ async def sync_google_sheets(request: Request, db: Session = Depends(get_db)):
                 start_row = max(2, int(skip))
                 range_name = f"'{sheet_name}'!A{start_row}:Z{start_row + int(limit) - 1}"
             else:
-                range_name = f"'{sheet_name}'!A2:Z1001"
+                range_name = f"'{sheet_name}'!A2:Z501"
 
             data = fetch_sheet_data(spreadsheet_id, range_name)
             rows = data if data else []

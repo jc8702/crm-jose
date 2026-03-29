@@ -551,7 +551,6 @@
         margin: 0 15px;
     }
     </style>
-    </style>
 
     <!-- PROPOSTA PDF: CSS do Modal -->
     <style>
@@ -597,8 +596,7 @@
     #fabContagem{background:#e74c3c;color:#fff;border-radius:50%;width:22px;height:22px;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     </style>
 
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-    <title>HACO RFID CRM - Gestão de Carteira</title>
+    <title>HACO RFID - Gestão de Carteira e Projetos - José Carlos</title>
 </head>
 <body>
     <!-- SIDEBAR MENU -->
@@ -798,14 +796,13 @@
                                 <th>Valor</th>
                                 <th>Vendedor</th>
                                 <th>NF</th>
-                                <th>Etiqueta</th>
                                 <th>Status.</th>
                                 <th>Entrega</th>
                                 <th style="text-align: center; white-space: nowrap;">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaFaturamentosDetalhados">
-                            <tr><td colspan="11" style="text-align: center;">Nenhum faturamento inserido neste mês</td></tr>
+                            <tr><td colspan="10" style="text-align: center;">Nenhum faturamento inserido neste mês</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -847,10 +844,36 @@
                     </div>
                 </div>
 
-                <div class="row">
                     <div class="form-group">
                         <label>Valor (R$)</label>
                         <input type="number" id="valorFaturamento" placeholder="0.00" step="0.01" min="0">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>Vendedor</label>
+                        <input type="text" id="vendedorFaturamento" placeholder="Nome do vendedor">
+                    </div>
+                    <div class="form-group">
+                        <label>Nota Fiscal</label>
+                        <input type="text" id="notaFaturamento" placeholder="Número da NF">
+                    </div>
+                </div>
+
+                <div class="row">
+                   <div class="form-group">
+                        <label>Status do Pedido</label>
+                        <select id="statusPedFaturamento">
+                            <option value="Agendado">Agendado</option>
+                            <option value="Produção">Produção</option>
+                            <option value="Finalizado">Finalizado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Data de Entrega</label>
+                        <input type="date" id="entregaFaturamento">
                     </div>
                 </div>
 
@@ -861,6 +884,37 @@
                     <button class="btn-primary" onclick="abrirModalImportarPlanilha()" style="background: linear-gradient(135deg, #0e6e6e, #0a4d4d); display: flex; align-items: center; gap: 8px; opacity: 0.7;">📥 Importar Manual (Excel)</button>
                 </div>
                 <div id="resultadoFaturamento" style="display: none; margin-top: 20px;"></div>
+            </div>
+
+            <!-- Tabela de Faturamentos na própria tela de Faturamento -->
+            <div class="section" style="margin-top: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                    <h2 style="margin: 0;">📋 Faturamentos Recentes</h2>
+                    <div style="font-size: 13px; color: var(--text-secondary);">Exibindo mesmos dados do Dashboard</div>
+                </div>
+                
+                <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                    <table style="width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0;">
+                        <thead>
+                            <tr>
+                                <th>📅 Data</th>
+                                <th>📦 Pedido</th>
+                                <th>👤 Cliente</th>
+                                <th>🆔 ERP</th>
+                                <th>💰 Valor</th>
+                                <th>👤 Vend.</th>
+                                <th>🧾 NF</th>
+                                <th>⚙️ Status</th>
+                                <th>🚚 Entrega</th>
+                                <th style="text-align: center;">⚙️ Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaFaturamentosManual">
+                            <!-- Populated via atualizarDashboard -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="paginacaoFaturamentoManualContainer" style="margin-top: 20px;"></div>
             </div>
         </div>
 
@@ -1471,10 +1525,6 @@
                 <div class="form-group">
                     <label>Nota Fiscal</label>
                     <input type="text" id="notaFaturamentoEditar" placeholder="Ex: 000.123.456">
-                </div>
-                <div class="form-group">
-                    <label>Cód. Etiqueta</label>
-                    <input type="text" id="etiquetaFaturamentoEditar" placeholder="Ex: ABC-123">
                 </div>
             </div>
 
@@ -3649,7 +3699,7 @@
             document.getElementById('tituloFaturamentosDetalhados').textContent = titulo;
 
             if (faturamentosFiltrados.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" style="text-align: center;">Nenhum faturamento encontrado com os filtros aplicados</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Nenhum faturamento encontrado com os filtros aplicados</td></tr>';
                 document.getElementById('paginacaoFaturamentoContainer').innerHTML = '';
             } else {
                 const totalFaturado = faturamentosFiltrados
@@ -3675,7 +3725,6 @@
                         <td style="white-space: nowrap;">R$ ${f.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                         <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${f.vendedor}">${f.vendedor || '-'}</td>
                         <td>${f.notaFiscal || '-'}</td>
-                        <td>${f.codigoEtiqueta || '-'}</td>
                         <td style="font-size:12px">${f.statusPedido || '-'}</td>
                         <td>${formatarDataVisao(f.dataEntrega)}</td>
                         <td style="white-space: nowrap; text-align: center;">
@@ -3693,13 +3742,27 @@
                 tbody.innerHTML += `
                     <tr style="background: rgba(0,0,0,0.05); font-weight: 600; border-top: 2px solid var(--border);">
                         <td colspan="4" style="text-align: right;">TOTAL FILTRADO:</td>
-                        <td colspan="6">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td colspan="5">R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                 `;
 
                 // Renderiza controles de página
                 const _mesAtual = mes, _cliAtual = clienteFiltro, _busAtual = buscaPedido, _stAtual = filtroStatus, _diAtual = dataInicial, _dfAtual = dataFinal;
+                
+                // Popula a tabela secundária na tela de Faturamentos Manual se o elemento existir
+                const tbodyManual = document.getElementById('tabelaFaturamentosManual');
+                if (tbodyManual) {
+                    tbodyManual.innerHTML = tbody.innerHTML;
+                    // Se precisar de botões idênticos que funcionem, eles já estão usando funções globais.
+                }
+
                 renderizarControlesPaginacao(totalItens, () => renderizarTabelaComFiltro(_mesAtual, _cliAtual, _busAtual, _stAtual, _diAtual, _dfAtual));
+                
+                // Paginacao para a tabela manual se existir
+                const pagContainer = document.getElementById('paginacaoFaturamentoManualContainer');
+                if (pagContainer) {
+                    pagContainer.innerHTML = document.getElementById('paginacaoFaturamentoContainer').innerHTML;
+                }
             }
         }
 
@@ -3800,12 +3863,22 @@
                 return;
             }
 
+            const vendedor = document.getElementById('vendedorFaturamento').value;
+            const notaFiscal = document.getElementById('notaFaturamento').value;
+            const statusPedido = document.getElementById('statusPedFaturamento').value;
+            const dataEntrega = document.getElementById('entregaFaturamento').value;
+
             const novoFat = {
                 cliente, erp, valor, data,
                 pedidoHaco: pedidoHaco || '-',
-                vendedor: '-', notaFiscal: '-',
-                codigoEtiqueta: '-', statusPedido: 'pendente', dataEntrega: '-'
+                vendedor: vendedor || '-',
+                notaFiscal: notaFiscal || '-',
+                statusPedido: statusPedido || 'Agendado',
+                dataEntrega: dataEntrega || data
             };
+            
+            // Note: codigoEtiqueta is no longer used but we keep the structure for now
+            novoFat.codigoEtiqueta = '-';
 
             app.faturamentos.push(novoFat);
             atualizarDashboard();
@@ -3821,6 +3894,10 @@
                 document.getElementById('dataFaturamento').value = '';
                 document.getElementById('pedidoHaco').value = '';
                 document.getElementById('valorFaturamento').value = '';
+                document.getElementById('vendedorFaturamento').value = '';
+                document.getElementById('notaFaturamento').value = '';
+                document.getElementById('statusPedFaturamento').value = 'Agendado';
+                document.getElementById('entregaFaturamento').value = '';
 
                 setTimeout(() => { document.getElementById('resultadoFaturamento').style.display = 'none'; }, 3000);
             } catch (err) {
@@ -7724,13 +7801,15 @@
                         </label>
                     `;
                 });
-                const firstSelected = document.querySelector('.chk-gs-sheet:checked')?.value || sheetsData.sheets[0];
-                const response = await fetch(`/api/google-sheets/headers?spreadsheet_id=${spreadsheet_id}&sheet_name=${firstSelected}`);
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Não foi possível carregar a planilha.');
-                const headers = data.headers;
+                const dataResp = await response.json();
+                if (!response.ok) {
+                    console.error('Fetch headers error:', dataResp.detail);
+                    document.getElementById('gs_mapping_container').style.display = 'none';
+                    return; 
+                }
+                const headers = dataResp.headers;
                 if (!headers || headers.length === 0) throw new Error('Planilha vazia ou sem cabeçalhos.');
-                const fields = ['cliente', 'data', 'valor', 'pedido', 'erp', 'vendedor', 'nota', 'etiqueta', 'status_ped', 'entrega'];
+                const fields = ['cliente', 'valor', 'pedido', 'erp', 'vendedor', 'nota', 'status_ped', 'entrega'];
                 const mapping = config.mapping || {};
                 fields.forEach(f => {
                     const select = document.getElementById(`gs_map_${f}`);
@@ -7772,16 +7851,17 @@
                 
                 const mapping = {
                     'Cliente': document.getElementById('gs_map_cliente').value,
-                    'Data': document.getElementById('gs_map_data').value,
                     'Valor': document.getElementById('gs_map_valor').value,
                     'Pedido Haco': document.getElementById('gs_map_pedido').value,
                     'Código ERP': document.getElementById('gs_map_erp').value,
                     'Vendedor': document.getElementById('gs_map_vendedor').value,
                     'Nota Fiscal': document.getElementById('gs_map_nota').value,
-                    'Código Etiqueta': document.getElementById('gs_map_etiqueta').value,
                     'Status Pedido': document.getElementById('gs_map_status_ped').value,
                     'Data Entrega': document.getElementById('gs_map_entrega').value
                 };
+                
+                // Fallback: se não temos campo Data separado, usamos Data de Entrega como data base do CRM
+                mapping['Data'] = mapping['Data Entrega'];
 
                 const vendedor_filter = document.getElementById('gs_filter_vendedor').value.trim();
                 const auto_sync = document.getElementById('gs_auto_sync').checked;
@@ -8260,10 +8340,6 @@
                         <select id="gs_map_cliente"></select>
                     </div>
                     <div class="mapping-item">
-                        <label>📅 Data do Faturamento</label>
-                        <select id="gs_map_data"></select>
-                    </div>
-                    <div class="mapping-item">
                         <label>💰 Valor (R$)</label>
                         <select id="gs_map_valor"></select>
                     </div>
@@ -8282,10 +8358,6 @@
                     <div class="mapping-item">
                         <label>🧾 Nota Fiscal</label>
                         <select id="gs_map_nota"></select>
-                    </div>
-                    <div class="mapping-item">
-                        <label>🏷️ Cód. Etiqueta</label>
-                        <select id="gs_map_etiqueta"></select>
                     </div>
                     <div class="mapping-item">
                         <label>⚙️ Status Pedido</label>
