@@ -13,47 +13,35 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --primary:        #1d4ed8;
-            --primary-light:  #eff6ff;
-            --primary-dark:   #1e3a8a;
-            --secondary:      #0ea5e9;
-            --accent:         #f97316;
+            --primary:        #FF7A00;
+            --primary-light:  rgba(255,122,0,0.15);
+            --primary-dark:   #CC6200;
+            --secondary:      #262626;
+            --accent:         #FF7A00;
             --success:        #10b981;
             --warning:        #f59e0b;
-            --warning-light:  #fff3cd;
+            --warning-light:  rgba(245, 158, 11, 0.15);
             --danger:         #ef4444;
-            --light-bg:       #f1f5f9;
-            --bg-section:     #f1f5f9;
-            --card-bg:        #ffffff;
-            --border:         #e2e8f0;
-            --border-strong:  #cbd5e1;
-            --text-primary:   #0f172a;
-            --text-secondary: #64748b;
-            --text-muted:     #94a3b8;
-            --sidebar-bg:     #0f172a;
-            --sidebar-text:   rgba(255,255,255,0.72);
-            --sidebar-active: #ffffff;
+            --light-bg:       #121212;
+            --bg-section:     #1A1A1A;
+            --card-bg:        #1E1E1E;
+            --border:         #333333;
+            --border-strong:  #444444;
+            --text-primary:   #F3F4F6;
+            --text-secondary: #9CA3AF;
+            --text-muted:     #6B7280;
+            --sidebar-bg:     #121212;
+            --sidebar-text:   #9CA3AF;
+            --sidebar-active: #FFFFFF;
             --sidebar-w:      260px;
-            --shadow-sm:      0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-            --shadow-md:      0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-            --shadow-lg:      0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.05);
+            --shadow-sm:      0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+            --shadow-md:      0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3);
+            --shadow-lg:      0 12px 32px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.3);
             --r-sm: 8px;
             --r-md: 12px;
             --r-lg: 16px;
             --font: 'Plus Jakarta Sans', -apple-system, sans-serif;
             --font-mono: 'DM Mono', monospace;
-        }
-        :root.dark-mode {
-            --light-bg:       #0d1117;
-            --bg-section:     #0d1117;
-            --card-bg:        #161b22;
-            --border:         #30363d;
-            --border-strong:  #484f58;
-            --text-primary:   #e6edf3;
-            --text-secondary: #8b949e;
-            --text-muted:     #6e7681;
-            --primary-light:  rgba(29,78,216,0.15);
-            --warning-light:  rgba(245, 158, 11, 0.15);
         }
         body {
             font-family: var(--font);
@@ -123,14 +111,11 @@
         }
         .nav-menu button:hover { background: rgba(255,255,255,0.07); color: #ffffff; }
         .nav-menu button.active {
-            background: rgba(29,78,216,0.85);
-            color: #ffffff;
+            background: var(--primary);
+            color: #121212 !important;
             font-weight: 700;
-            box-shadow: 0 2px 8px rgba(29,78,216,0.4);
+            box-shadow: 0 4px 16px rgba(255,122,0,0.4);
         }
-        :root.dark-mode .nav-menu button { color: var(--sidebar-text); }
-        :root.dark-mode .nav-menu button:hover { background: rgba(255,255,255,0.07); color: #ffffff; }
-        :root.dark-mode .nav-menu button.active { background: rgba(29,78,216,0.85); color: #ffffff; }
         .toggle-sidebar {
             display: none;
             position: fixed;
@@ -304,8 +289,8 @@
             font-weight: 600;
             transition: all 0.18s ease;
         }
-        .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(29,78,216,0.25); }
-        .btn-primary:hover { background: var(--primary-dark); box-shadow: 0 4px 12px rgba(29,78,216,0.35); transform: translateY(-1px); }
+        .btn-primary { background: var(--primary); color: #121212; box-shadow: 0 4px 16px rgba(255,122,0,0.3); }
+        .btn-primary:hover { background: var(--primary-light); color: var(--primary); border: 1.5px solid var(--primary); box-shadow: 0 6px 20px rgba(255,122,0,0.4); transform: translateY(-1px); }
         .btn-danger  { background: var(--danger);  color: white; padding: 6px 12px; font-size: 12px; }
         .btn-danger:hover  { background: #dc2626; transform: translateY(-1px); }
         .btn-success { background: var(--success); color: white; padding: 6px 12px; font-size: 12px; }
@@ -542,17 +527,17 @@
     }
     .page-btn:hover:not(:disabled) {
         transform: translateY(-4px) scale(1.05);
-        background: linear-gradient(135deg, #0e6e6e, #1a9a9a);
-        color: white;
+        background: linear-gradient(135deg, #CC6200, #FF7A00);
+        color: #121212;
         border-color: transparent;
-        box-shadow: 0 8px 20px rgba(14, 110, 110, 0.25);
+        box-shadow: 0 8px 20px rgba(255, 122, 0, 0.25);
     }
     .page-btn.active {
-        background: linear-gradient(135deg, #0a2540, #0e6e6e);
-        color: white;
+        background: linear-gradient(135deg, #FF7A00, #FFA559);
+        color: #121212;
         border-color: transparent;
         transform: scale(1.15);
-        box-shadow: 0 5px 15px rgba(14, 110, 110, 0.3);
+        box-shadow: 0 5px 15px rgba(255, 122, 0, 0.3);
     }
     .page-btn:disabled {
         opacity: 0.4;
@@ -1390,9 +1375,16 @@
                 </div>
 
                 <!-- Status do arquivo -->
-                <div id="importArquivoStatus" style="display: none; margin-bottom: 12px; padding: 10px 14px; border-radius: 7px; background: var(--light-bg); font-size: 13px; display: none; align-items: center; gap: 10px;">
+                <div id="importArquivoStatus" style="display: none; margin-bottom: 12px; padding: 10px 14px; border-radius: 7px; background: var(--light-bg); font-size: 13px; align-items: center; gap: 10px;">
                     <span id="importArquivoNome" style="font-weight: 600;"></span>
                     <span id="importArquivoLinhas" style="color: var(--text-secondary);"></span>
+                </div>
+
+                <!-- SELEÇÃO DE ABAS MULTIPLAS -->
+                <div id="selecaoAbasContainer" style="display: none; margin-bottom: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-section);">
+                    <h3 style="font-size: 14px; margin-bottom: 8px;">📑 Selecione as Abas para Importar</h3>
+                    <div id="listaAbasCheckbox" style="display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; margin-bottom: 10px;"></div>
+                    <button type="button" onclick="confirmarSelecaoAbas()" class="btn-primary" style="width: 100%; padding: 8px; border-radius: 6px;">Avançar & Ler Dados</button>
                 </div>
 
                 <!-- Preview da Tabela -->
@@ -1400,8 +1392,8 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h3 style="margin: 0; font-size: 15px;">👀 Preview dos Dados</h3>
                         <div style="display: flex; gap: 12px; font-size: 13px;">
-                            <span id="importContadorValidos" style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 12px; font-weight: 700;">✅ 0 válidos</span>
-                            <span id="importContadorInvalidos" style="background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 12px; font-weight: 700;">❌ 0 inválidos</span>
+                            <span id="importContadorValidos" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 12px; border-radius: 12px; font-weight: 700;">✅ 0 válidos</span>
+                            <span id="importContadorInvalidos" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 4px 12px; border-radius: 12px; font-weight: 700;">❌ 0 inválidos</span>
                         </div>
                     </div>
                     <div style="overflow-x: auto; max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
@@ -1427,8 +1419,8 @@
 
             <!-- Rodapé -->
             <div style="padding: 16px 24px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--border); margin-top: 18px;">
-                <button onclick="fecharModalImportarPlanilha()" style="padding: 10px 22px; border: 1.5px solid var(--border); background: transparent; color: var(--text); border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 14px;">Cancelar</button>
-                <button id="btnConfirmarImport" onclick="confirmarImportacao()" disabled style="padding: 10px 28px; background: linear-gradient(135deg, #0a2540, #0e6e6e); color: white; border: none; border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 14px; opacity: 0.5; transition: opacity 0.2s;">✅ Confirmar Importação</button>
+                <button onclick="fecharModalImportarPlanilha()" style="padding: 10px 22px; border: 1.5px solid var(--border); background: transparent; color: var(--text-primary); border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 14px;">Cancelar</button>
+                <button id="btnConfirmarImport" class="btn-primary" onclick="confirmarImportacao()" disabled style="padding: 10px 28px; border: none; border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 14px; opacity: 0.5; transition: opacity 0.2s;">✅ Confirmar Importação</button>
             </div>
         </div>
     </div>
@@ -7382,15 +7374,18 @@
 
         function resetarImportModal() {
             importDadosProcessados = [];
+            globalWorkbook = null;
             document.getElementById('inputPlanilha').value = '';
             document.getElementById('importPreviewContainer').style.display = 'none';
             document.getElementById('importResultado').style.display = 'none';
             document.getElementById('importArquivoStatus').style.display = 'none';
+            document.getElementById('selecaoAbasContainer').style.display = 'none';
             const btn = document.getElementById('btnConfirmarImport');
             btn.disabled = true;
             btn.style.opacity = '0.5';
             btn.style.cursor = 'not-allowed';
             const drop = document.getElementById('importDropArea');
+            drop.style.display = 'block';
             drop.style.borderColor = 'var(--border)';
             drop.style.background = '';
         }
@@ -7399,8 +7394,8 @@
             e.preventDefault();
             e.stopPropagation();
             const drop = document.getElementById('importDropArea');
-            drop.style.borderColor = '#0e6e6e';
-            drop.style.background = 'rgba(14,110,110,0.05)';
+            drop.style.borderColor = 'var(--primary)';
+            drop.style.background = 'rgba(255,122,0,0.05)';
         }
 
         function importDragLeave(e) {
@@ -7433,6 +7428,8 @@
             return null;
         }
 
+        let globalWorkbook = null;
+
         function processarArquivoPlanilha(file) {
             if (!file) return;
             if (typeof XLSX === 'undefined') {
@@ -7450,11 +7447,52 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    globalWorkbook = workbook;
+                    
+                    if (workbook.SheetNames.length === 1) {
+                        executarExtracaoAbas([workbook.SheetNames[0]]);
+                    } else {
+                        document.getElementById('importDropArea').style.display = 'none';
+                        document.getElementById('selecaoAbasContainer').style.display = 'block';
+                        const container = document.getElementById('listaAbasCheckbox');
+                        container.innerHTML = '';
+                        workbook.SheetNames.forEach((sheetName) => {
+                            container.innerHTML += `
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; padding: 6px; border-radius: 6px; background: var(--card-bg); border: 1px solid var(--border);">
+                                    <input type="checkbox" value="${sheetName}" class="chk-aba-excel" checked>
+                                    ${sheetName}
+                                </label>
+                            `;
+                        });
+                        document.getElementById('importArquivoLinhas').textContent = 'Esperando seleção de abas...';
+                    }
+                } catch (err) {
+                    alert('Erro ao processar arquivo: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
-                    let importDadosAdicionados = [];
-                    let abasLidas = [];
+        function confirmarSelecaoAbas() {
+            const checkboxes = document.querySelectorAll('.chk-aba-excel:checked');
+            if (checkboxes.length === 0) {
+                alert('Selecione pelo menos uma aba para continuar.');
+                return;
+            }
+            const abasSelecionadas = Array.from(checkboxes).map(cb => cb.value);
+            document.getElementById('selecaoAbasContainer').style.display = 'none';
+            document.getElementById('importArquivoLinhas').textContent = 'Lendo dados...';
+            executarExtracaoAbas(abasSelecionadas);
+        }
 
-                    workbook.SheetNames.forEach(sheetName => {
+        function executarExtracaoAbas(abasNames) {
+            if (!globalWorkbook) return;
+            const workbook = globalWorkbook;
+            
+            let importDadosAdicionados = [];
+            let abasLidas = [];
+
+            abasNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
                         const rows = XLSX.utils.sheet_to_json(sheet, { raw: true, defval: '' });
 
@@ -7566,13 +7604,6 @@
                     });
 
                     renderizarPreviewImport();
-
-                } catch (err) {
-                    console.error(err);
-                    alert('Erro ao processar o arquivo: ' + err.message);
-                }
-            };
-            reader.readAsArrayBuffer(file);
         }
 
         function renderizarPreviewImport() {
